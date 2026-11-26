@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MPC Cockpit</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="cockpit.css">
+<script src="config.js"></script>
+<script src="session.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+</head>
+<body>
+<div class="glow" aria-hidden="true"></div>
+
+<!-- SIGN IN (once per device) -->
+<main class="signin" id="signin" hidden>
+  <form id="signinForm">
+    <h1>MPC Cockpit</h1>
+    <p>Sign in once on this device. It remembers you here and in Tasks.</p>
+    <div><label for="siEmail">Email</label><input id="siEmail" type="email" autocomplete="username" required></div>
+    <div><label for="siPass">Password</label><input id="siPass" type="password" autocomplete="current-password" required></div>
+    <div class="err" id="siErr" role="alert"></div>
+    <button class="btnp" type="submit">Sign in</button>
+    <p>Same account as the Tasks app. Forgot your password? Reset it in <a href="https://dashboard.malindaperryconsulting.com/sign-in">Tasks</a>.</p>
+  </form>
+</main>
+
+<!-- COCKPIT -->
+<div class="app" id="app" hidden>
+  <header class="top">
+    <div class="hi">
+      <div class="date" id="dateLine"></div>
+      <h1 id="headline">Loading your day…</h1>
+    </div>
+    <div class="right">
+      <div class="co" role="group" aria-label="Which business" id="coSwitch">
+        <button type="button" class="all" data-co="all"><i style="background:conic-gradient(#1E9E98 0 50%,#F2607F 50% 100%)"></i><span>Both</span></button>
+        <button type="button" data-co="mpc"><i style="background:#1E9E98"></i>MPC</button>
+        <button type="button" data-co="hg" aria-label="Happy Girls"><i style="background:#F2607F"></i><span>Happy Girls</span></button>
+      </div>
+      <button type="button" class="chip" data-open-btn="settings" aria-label="Settings">⚙︎ Settings</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- CALENDAR -->
+    <section class="zone calzone" aria-label="Calendar" data-open="calendar">
+      <div class="zh">
+        <span class="ic" style="background:linear-gradient(135deg,#5AB6F5,#2F7FD0)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+        <h2>Calendar</h2>
+        <span class="sync">⇄ Google Calendar</span>
+        <span class="st" id="calNext"></span>
+        <div class="acts"><button class="chip expand" type="button" data-open-btn="calendar">⤢ Expand</button><button class="chip primary" type="button" id="addBtn" aria-expanded="false">+ Add</button></div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="cal" id="cal"></div>
+
+      <form class="addpop" id="addPop" hidden>
+        <div><label for="addWhat">What</label><input id="addWhat" placeholder="e.g. Call with the publisher" autocomplete="off" required></div>
+        <div><label>Calendar</label><div class="pick" id="pickCal"></div></div>
+        <div><label>Day</label><div class="pick" id="pickDay"></div></div>
+        <div><label>Time</label><div class="pick" id="pickTime"></div></div>
+        <div><label>How long</label><div class="pick" id="pickLen"></div></div>
+        <div class="row"><button type="button" class="chip" id="addCancel">Cancel</button><button type="submit" class="chip primary">Add to Google Calendar</button></div>
+      </form>
+    </section>
+
+    <div class="side">
+      <!-- EMAIL -->
+      <section class="zone" aria-label="Gmail" data-open="email">
+        <div class="zh">
+          <span class="ic" style="background:linear-gradient(135deg,#FF9A52,#E0602E)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3.5 7l8.5 6 8.5-6"/></svg></span>
+          <h2>Email</h2><span class="gmail">Gmail</span><span class="st" id="mailSt"></span>
+          <div class="acts"><button class="chip expand" type="button" data-open-btn="email">⤢ Expand</button></div>
+        </div>
+        <div class="asks" id="asks"></div>
+      </section>
+
+      <!-- NUMBERS -->
+      <section class="zone numzone" aria-label="Your numbers">
+        <div class="zh">
+          <span class="ic" style="background:linear-gradient(135deg,#2BB5AE,#126E72)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+          <h2>Numbers</h2><span class="st">Tap a line for details</span>
+        </div>
+        <div class="rows" id="rows"></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="dockwrap">
+    <nav class="dock" aria-label="Apps">
+      <button type="button" data-open-btn="tasks"><i style="background:linear-gradient(135deg,#F2607F,#C2386A)">✓</i><span>Tasks</span></button>
+      <button type="button" data-open-btn="email"><i style="background:linear-gradient(135deg,#FF9A52,#E0602E)">@</i><span>Gmail</span></button>
+      <button type="button" data-open-btn="calendar"><i style="background:linear-gradient(135deg,#5AB6F5,#2F7FD0)">31</i><span>Google Calendar</span></button>
+      <button type="button" data-open-btn="sales"><i style="background:linear-gradient(135deg,#2BB5AE,#126E72)">$</i><span>Payhip sales</span></button>
+      <button type="button" data-open-btn="links"><i style="background:#10292C">∞</i><span>Links</span></button>
+      <span class="sep"></span>
+      <button type="button" data-open-btn="sitempc"><i style="background:#1E9E98">MP</i><span>MPC website</span></button>
+      <button type="button" data-open-btn="settings"><i style="background:#53625F">⚙︎</i><span>Settings</span></button>
+    </nav>
+  </div>
+</div>
+
+<dialog class="modal" id="modal" aria-labelledby="mTitle">
+  <div class="mh"><span class="ic" id="mIcon"></span><div><h2 id="mTitle"></h2><p id="mSub"></p></div><button class="x" type="button" id="mClose" aria-label="Close">✕</button></div>
+  <div class="mb" id="mBody"></div>
+  <div class="mf" id="mFoot"><span class="note" id="mNote"></span><span class="gos"><a class="go alt" id="mGo2" href="#" target="_blank" rel="noopener" hidden></a><a class="go" id="mGo" href="#" target="_blank" rel="noopener"></a></span></div>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>

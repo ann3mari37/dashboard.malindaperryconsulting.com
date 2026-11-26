@@ -1,0 +1,9 @@
+{
+  "name": "mpc-cockpit",
+  "private": true,
+  "description": "MPC Cockpit: one screen for MaLinda Perry Consulting and Happy Girls Don't Do That",
+  "scripts": {
+    "deploy": "npx wrangler@4.49.1 pages deploy public --project-name mpc-cockpit --branch main",
+    "preview": "npx wrangler@4.49.1 pages dev public"
+  }
+}
