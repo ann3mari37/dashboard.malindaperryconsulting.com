@@ -1,5 +1,5 @@
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://noyenmjdzfglniennbdo.supabase.co wss://noyenmjdzfglniennbdo.supabase.co https://dashboard.malindaperryconsulting.com; frame-src https://dashboard.malindaperryconsulting.com https://links.malindaperryconsulting.com https://malindaperryconsulting.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://noyenmjdzfglniennbdo.supabase.co wss://noyenmjdzfglniennbdo.supabase.co https://tasks.malindaperryconsulting.com; frame-src https://tasks.malindaperryconsulting.com https://links.malindaperryconsulting.com https://malindaperryconsulting.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Robots-Tag: noindex, nofollow

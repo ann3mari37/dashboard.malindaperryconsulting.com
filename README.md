@@ -11,7 +11,7 @@ One screen for **MaLinda Perry Consulting** and **Happy Girls Don't Do That**, a
 | Dock | Tasks, Gmail, Calendar, Payhip, Links, website, Settings | |
 
 Every icon and section opens a **view inside the cockpit first**. Tasks and Links show the real apps
-(Momentum at `dashboard.malindaperryconsulting.com`, LinkHub at `links.malindaperryconsulting.com`), each in its own look.
+(Momentum at `tasks.malindaperryconsulting.com`, LinkHub at `links.malindaperryconsulting.com`), each in its own look.
 From a view, **Open** goes to the app itself: the website on a computer, the Gmail or Google Calendar app on a phone.
 
 ## Signing in and staying signed in
@@ -37,8 +37,10 @@ email and Payhip (one request per sale) go through the Tasks app's Worker.
 
 1. **Tasks app (repo `todos.jamry.us`)**: merge the cockpit branch, apply the migration
    `supabase/migrations/20261126000000_cockpit.sql`, and follow *MaLinda Perry cockpit* in `docs/OPERATIONS.md`
-   (enable the Google Calendar API, add the calendar scopes and the `dashboard.malindaperryconsulting.com` redirect URI).
-2. **LinkHub (repo `linkhub`)**: merge the cockpit branch and `npm run deploy` (adds `links.malindaperryconsulting.com`).
+   (enable the Google Calendar API, add the calendar scopes and the `tasks.malindaperryconsulting.com` redirect URI).
+   All of it is switched on only for malindaperryconsulting.com addresses; todos.jamry.us is unchanged.
+2. **LinkHub (repo `linkhub`)**: merge the cockpit branch and `npm run deploy`. It adds `links.malindaperryconsulting.com`,
+   the only address the cockpit may show it on; links.kittigutierrez.com and links.jamry.us are unchanged.
 3. **This site**: in Cloudflare (the account that holds `malindaperryconsulting.com`), create a Pages project
    `mpc-cockpit` connected to this repo with build output directory `public` and no build command, then add the custom
    domain `admin.malindaperryconsulting.com`. Or deploy by hand: `npm run deploy`.
