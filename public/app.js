@@ -30,7 +30,19 @@
   try { S.view = localStorage.getItem('cockpit.co') || 'all'; } catch (e) {}
 
   var src = function (kind, ref) { return S.sources[kind + '|' + ref]; };
-  var mailCo = function (acct) { var s = src('mailbox', acct); return s ? s.company : 'both'; };
+  // Until a business is picked in Settings, an inbox goes by its address: any part of malindaperryconsulting means
+  // MPC, any part of happy girls means Happy Girls, anything else counts for both.
+  var coFromAddress = function (email) {
+    var e = String(email || '').toLowerCase().replace(/[^a-z]/g, '');
+    if (/malinda|perryconsult/.test(e)) return 'mpc';
+    if (/happy|girlsdont/.test(e)) return 'hg';
+    return 'both';
+  };
+  var mailCo = function (acct) {
+    var s = src('mailbox', acct); if (s) return s.company;
+    var a = (S.accounts || []).find(function (x) { return x.id === acct; });
+    return coFromAddress(a && a.email_address);
+  };
   var calKey = function (acct, cal) { return acct + ':' + cal; };
   var calCo = function (acct, cal) { var s = src('calendar', calKey(acct, cal)); return s ? s.company : mailCo(acct); };
   var areaCo = function (id) { var s = id && src('area', id); return s ? s.company : 'both'; };

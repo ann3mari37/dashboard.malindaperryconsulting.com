@@ -340,3 +340,7 @@ a.btnl,label.btnl{display:inline-flex;align-items:center;text-decoration:none;co
 .steps code{display:block;margin-top:.35rem;font-size:.8rem;background:#FFF4EC;border-radius:.5rem;padding:.4rem .6rem;word-break:break-all}
 .sfoot{display:flex;justify-content:center;padding-top:.2rem}
 .linkbtn{border:0;background:none;color:var(--muted);font-weight:700;font-size:.85rem;text-decoration:underline;cursor:pointer}
+/* The modal body is a scrolling flex column: keep its parts at full size instead of squeezing them (the tab bar shrank to a thin empty strip when a list was long). */
+.mb > *, .ssec > *{flex-shrink:0}
+.stabs{min-height:2.8rem;top:0}
+@media (max-width:560px){.stabs{flex-wrap:wrap;overflow:visible}.stabs button{flex:1 1 30%;padding:0 .5rem;font-size:.8rem}}
