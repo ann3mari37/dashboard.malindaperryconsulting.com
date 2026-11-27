@@ -983,7 +983,8 @@
   var VIEWS = {
     email: function () {
       var groups = S.accounts.filter(function (a) { return inView(mailCo(a.id)); });
-      var body = (S.chatList ? '' : sodCta()) + (S.digest ? '<p class="mtext">' + esc(plainSummary(S.digest.summary)) + '</p>' : '');
+      // Exactly one of the two: today's summary from ChatGPT once it exists, the Start my day card until then.
+      var body = S.chatList ? (S.digest.summary ? '<p class="mtext">' + esc(plainSummary(S.digest.summary)) + '</p>' : '') : sodCta();
       body += groups.map(function (a) {
         var list = S.needs.filter(function (m) { return m.account_id === a.id; });
         return '<div><p class="mlabel">' + esc(a.email_address) + ' ' + tag(mailCo(a.id)) + ' · ' + list.length + (S.chatList ? ' to do first' : ' need a reply') + '</p><div class="mlist">' +
@@ -1002,7 +1003,7 @@
             '<p>' + esc(m.summary || m.snippet || '') + '</p>' + gmailActs(m, 'Open in Gmail') + '</div>';
         }).join('') : '<div class="msg"><p style="color:var(--muted)">No new mail in the last 24 hours.</p></div>') + '</div></div>';
       body += gmailHelp(groups);
-      return { t: 'Inbox', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
+      return { t: 'Inbox', sub: who() + (S.chatList ? ' · summary from ' + esc(chatName()) : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
     },
     sales: function () {
       var body = '<div class="mstats">' + salesCos().map(function (co) { var n = salesNumbers([co]); return '<div class="mstat"><span>' + esc(CO[co].short) + ' today</span><b class="num">' + money(n.today) + '</b><span>' + money(n.week) + ' last 7 days · ' + n.wn + ' sale' + (n.wn === 1 ? '' : 's') + '</span></div><div class="mstat"><span>' + esc(CO[co].short) + ' this month</span><b class="num">' + money(n.month) + '</b><span>' + (n.pct === null ? 'first month' : (n.pct >= 0 ? '▲' : '▼') + Math.abs(n.pct) + '% vs last month') + '</span></div>'; }).join('') + '</div>';

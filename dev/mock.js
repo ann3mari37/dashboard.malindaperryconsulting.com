@@ -72,7 +72,10 @@
       { id: 'm7', account_id: A1, thread_id: 'tm7', from_name: 'Leah Brooks', from_address: 'leah@example.com', subject: 'Coaching reschedule?', summary: 'Leah cannot make Thursday and offers two new times.', received_at: new Date(now - 9e6 * 3.6).toISOString(), category: 'action_needed', importance: 2 },
       { id: 'm3', account_id: A1, thread_id: 't3', from_name: 'Payhip', from_address: 'no-reply@payhip.com', subject: 'You made a sale!', summary: 'Unstuck Workbook sold for $19.', received_at: new Date(now - 9e6).toISOString(), category: 'fyi', importance: 1 }
     ],
-    email_digests: [{ summary: 'Two emails need you today: Dana’s contract notes, and Jordan’s podcast date. Everything else can wait.', digest_date: iso(new Date()), source: 'rules', author: 'ChatGPT', do_first: null }],
+    // ?chat in the address (or localStorage mock.chat = 1): ChatGPT has already summarized today (its do-first list replaces the rule-based one).
+    email_digests: [(/[?&]chat/.test(location.search) || (function () { try { return localStorage.getItem('mock.chat') === '1'; } catch (e) { return false; } })())
+      ? { summary: 'Start with Dana’s contract notes, then pick Jordan’s podcast date. The rest can wait until after lunch.', digest_date: iso(new Date()), source: 'chat', author: 'ChatGPT', do_first: [{ message_id: 'm1', why: 'Her call is Thursday and she needs your notes first.' }, { message_id: 'm2', why: 'Jordan is holding two dates for you.' }] }
+      : { summary: 'Two emails need you today: Dana’s contract notes, and Jordan’s podcast date. Everything else can wait.', digest_date: iso(new Date()), source: 'rules', author: 'Momentum', do_first: null }],
     daily_checkins: [],
     payhip_stores: [{ id: 's1', name: 'MPC Books', company: 'mpc', created_at: new Date(now - 30 * 864e5).toISOString() }],
     payhip_sales: (function () { var l = []; for (var i = 0; i < 60; i++) l.push({ id: 'p' + i, store_id: 's1', amount: [19, 29, 9.99, 49][i % 4], currency: 'USD', items: [['Unstuck Workbook'], ['Unstuck'], ['Coaching guide'], ['Bundle']][i % 4], sold_at: new Date(now - (i * 0.9 + (i % 3)) * 864e5).toISOString(), refunded: false }); return l; })(),
