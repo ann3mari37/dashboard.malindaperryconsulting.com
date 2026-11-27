@@ -37,6 +37,8 @@
   var storeCo = function (id) { var st = S.stores.find(function (x) { return x.id === id; }); return st ? st.company : 'both'; };
   var inView = function (co) { return S.view === 'all' || co === 'both' || co === S.view; };
   var cosInView = function () { return S.view === 'all' ? ['mpc', 'hg'] : [S.view]; };
+  // Sales show only the businesses that have a Payhip store, so a business with no products stays out of the numbers.
+  var salesCos = function () { var l = cosInView().filter(function (co) { return S.stores.some(function (st) { return st.company === co || st.company === 'both'; }); }); return l.length ? l : cosInView(); };
   var tag = function (co) { return co === 'both' || !CO[co] ? '' : '<span class="cotag" style="background:' + CO[co].bg + ';color:' + CO[co].ink + '">' + esc(CO[co].short) + '</span>'; };
 
   /* ---------------- api ---------------- */
@@ -306,7 +308,7 @@
       return;
     }
     var max = innerWidth < 760 ? 2 : 3;
-    $('#asks').innerHTML = '<p class="lead">' + (S.chatList ? (list.length ? '<span>' + list.length + '</span> to do first · ' + esc(chatName()) : 'All done from ' + esc(chatName()) + '’s list.') : (list.length ? '<span>' + list.length + '</span> need' + (list.length === 1 ? 's' : '') + ' a reply' : 'Nothing needs a reply.')) + '</p>' +
+    $('#asks').innerHTML = '<p class="lead">' + (S.chatList ? (list.length ? '<span>' + list.length + '</span> to do first · ' + esc(chatName()) : 'All done from ' + esc(chatName()) + '’s list.') : (list.length ? '<span>' + list.length + '</span> need' + (list.length === 1 ? 's' : '') + ' a reply' : 'Nothing needs a reply.') + ' <small>· ChatGPT hasn’t sorted today’s email yet</small>') + '</p>' +
       list.slice(0, max).map(function (m) {
         return '<div class="ask" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><span class="tx"><b>' + esc(m.from_name || m.from_address) + ' · ' + esc(m.subject || '(no subject)') + ' ' + (S.view === 'all' ? tag(mailCo(m.account_id)) : '') + '</b><span>' + esc(m.why || m.summary || m.snippet || '') + '</span></span><button class="open2" type="button" data-open-btn="email">Open</button></div>';
       }).join('') +
@@ -337,7 +339,7 @@
     var max = Math.max.apply(null, sn.spark.concat([1]));
     var path = sn.spark.map(function (v, i) { return (i ? 'L' : 'M') + (i * 100 / 13).toFixed(1) + ' ' + (22 - v / max * 20).toFixed(1); }).join(' ');
     var salesNote = !S.stores.length ? '<span>Add your Payhip stores in Settings</span>' :
-      (split(function (co) { return money(salesNumbers([co]).week); }) || '<span>' + money(sn.month) + ' this month' + (sn.pct !== null ? ' <span class="up">' + (sn.pct >= 0 ? '▲' : '▼') + Math.abs(sn.pct) + '%</span>' : '') + '</span>');
+      (salesCos().length > 1 && split(function (co) { return money(salesNumbers([co]).week); }) || '<span>' + money(sn.month) + ' this month' + (sn.pct !== null ? ' <span class="up">' + (sn.pct >= 0 ? '▲' : '▼') + Math.abs(sn.pct) + '%</span>' : '') + '</span>');
     $('#rows').innerHTML =
       '<button class="nr" type="button" data-open-btn="tasks"><span class="ni" style="background:linear-gradient(135deg,#2BB5AE,#126E72)">' + SV + '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/></svg></span><span class="nm"><b>Tasks today</b>' + (split(tFor) || '<span>' + (tasks.length - done) + ' left' + (S.taskSource === 'due' ? ' · due today' : '') + '</span>') + '</span><span class="v num">' + done + '<small>of ' + tasks.length + '</small></span><span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:#1E9E98"></i></span><span class="chev">›</span></button>' +
       '<button class="nr" type="button" data-open-btn="email"><span class="ni" style="background:linear-gradient(135deg,#FF9A52,#E0602E)">' + SV + '<path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 2h6l1-2h5"/></svg></span><span class="nm"><b>Emails</b>' + (split(eFor) || '<span>' + needs + (S.chatList ? ' to do first' : ' need a reply') + '</span>') + '</span><span class="v num">' + fresh + '<small>new</small></span><span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:#FF8A4C"></i></span><span class="chev">›</span></button>' +
@@ -457,7 +459,7 @@
       return { t: 'Gmail', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
     },
     sales: function () {
-      var body = '<div class="mstats">' + cosInView().map(function (co) { var n = salesNumbers([co]); return '<div class="mstat"><span>' + esc(CO[co].short) + ' last 7 days</span><b class="num">' + money(n.week) + '</b><span>' + n.wn + ' sale' + (n.wn === 1 ? '' : 's') + '</span></div><div class="mstat"><span>' + esc(CO[co].short) + ' this month</span><b class="num">' + money(n.month) + '</b><span>' + (n.pct === null ? 'first month' : (n.pct >= 0 ? '▲' : '▼') + Math.abs(n.pct) + '% vs last month') + '</span></div>'; }).join('') + '</div>';
+      var body = '<div class="mstats">' + salesCos().map(function (co) { var n = salesNumbers([co]); return '<div class="mstat"><span>' + esc(CO[co].short) + ' last 7 days</span><b class="num">' + money(n.week) + '</b><span>' + n.wn + ' sale' + (n.wn === 1 ? '' : 's') + '</span></div><div class="mstat"><span>' + esc(CO[co].short) + ' this month</span><b class="num">' + money(n.month) + '</b><span>' + (n.pct === null ? 'first month' : (n.pct >= 0 ? '▲' : '▼') + Math.abs(n.pct) + '% vs last month') + '</span></div>'; }).join('') + '</div>';
       var m0 = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       var prod = {};
       salesInView().filter(function (s) { return new Date(s.sold_at) >= m0; }).forEach(function (s) { var k = (s.items && s.items.length ? s.items.join(', ') : 'Sale') + '|' + storeCo(s.store_id); prod[k] = prod[k] || { n: 0, amt: 0 }; prod[k].n++; prod[k].amt += Number(s.amount); });

@@ -101,6 +101,7 @@ a{color:inherit;text-decoration:none}
 .asks{flex:1;min-height:0;display:flex;flex-direction:column;gap:.45rem;padding:.8rem 1rem 1rem}
 .lead{font-size:1.15rem;font-weight:800;letter-spacing:-.02em;margin:0 0 .2rem}
 .lead span{color:#E0602E}
+.lead small{display:block;font-size:.8rem;font-weight:600;letter-spacing:0;color:var(--muted)}
 .ask{display:flex;align-items:center;gap:.7rem;padding:.5rem .55rem .5rem .6rem;border-radius:.9rem;background:var(--white);border:1px solid var(--line);transition:transform .35s,opacity .35s}
 .ask.gone{transform:translateX(2rem);opacity:0}
 .ask .av{width:2.1rem;height:2.1rem;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;font-size:.7rem;font-weight:700;color:#fff}
