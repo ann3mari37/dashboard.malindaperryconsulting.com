@@ -344,3 +344,18 @@ a.btnl,label.btnl{display:inline-flex;align-items:center;text-decoration:none;co
 .mb > *, .ssec > *{flex-shrink:0}
 .stabs{min-height:2.8rem;top:0}
 @media (max-width:560px){.stabs{flex-wrap:wrap;overflow:visible}.stabs button{flex:1 1 30%;padding:0 .5rem;font-size:.8rem}}
+/* Calendar: side list of calendars by Google address, like Google Calendar (replaces the strip of buttons on top) */
+.calbody{flex:1;min-height:0;display:grid;grid-template-columns:13rem minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+.calbody .cal{min-height:0;height:100%}
+.legend{display:flex;flex-direction:column;flex-wrap:nowrap;gap:.1rem;padding:.8rem .6rem;border-bottom:0;border-right:1px solid var(--line);overflow-y:auto;min-height:0}
+.cgroup{display:flex;flex-direction:column;gap:.1rem;margin-bottom:.7rem}
+.caddr{margin:0 0 .3rem .4rem;font-size:.72rem;font-weight:800;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legend button{height:auto;min-height:2rem;padding:.3rem .45rem;border:0;background:none;border-radius:.55rem;text-align:left;width:100%;font-weight:600;font-size:.82rem;gap:.55rem}
+.legend button:hover{background:var(--cream)}
+.legend button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.legend button i{flex:0 0 auto}
+.legend button[aria-pressed=false]{opacity:.55}
+.legend .addcal{border:0;border-style:none;color:var(--muted);margin-top:.1rem;font-weight:700}
+.calsbtn{display:none}
+@media (max-width:760px){.calbody{grid-template-columns:minmax(0,1fr)}.legend{display:none!important}.calsbtn{display:inline-flex}}
+.caddr{white-space:normal;overflow-wrap:break-word;line-height:1.3}

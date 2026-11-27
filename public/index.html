@@ -54,10 +54,12 @@
         <h2>Calendar</h2>
         <span class="sync">⇄ Google Calendar</span>
         <span class="st" id="calNext"></span>
-        <div class="acts"><button class="chip expand" type="button" data-open-btn="calendar">⤢ Expand</button><button class="chip primary" type="button" id="addBtn" aria-expanded="false">+ Add</button></div>
+        <div class="acts"><button class="chip calsbtn" type="button" data-open-btn="settings" data-tab="calendars">Calendars</button><button class="chip expand" type="button" data-open-btn="calendar">⤢ Expand</button><button class="chip primary" type="button" id="addBtn" aria-expanded="false">+ Add</button></div>
       </div>
-      <div class="legend" id="legend"></div>
-      <div class="cal" id="cal"></div>
+      <div class="calbody">
+        <aside class="legend" id="legend" aria-label="My calendars"></aside>
+        <div class="cal" id="cal"></div>
+      </div>
 
       <form class="addpop" id="addPop" hidden>
         <div><label for="addWhat">What</label><input id="addWhat" placeholder="e.g. Call with the publisher" autocomplete="off" required></div>

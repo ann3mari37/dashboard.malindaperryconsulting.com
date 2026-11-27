@@ -265,13 +265,21 @@
   function renderLegend() {
     var el = $('#legend');
     if (!S.calLoaded) { el.innerHTML = '<span class="gsrc">Loading calendars…</span>'; return; }
+    // A side list like Google Calendar's: calendars grouped under their Google address (sorted), each with a box
+    // to show or hide it. The account's own calendar comes first and is called "Main calendar".
     var cals = S.cals.filter(function (c) { return inView(calCo(c.account_id, c.id)); });
     var needs = S.calAccounts.filter(function (a) { return a.status === 'needs_calendar_access'; });
-    el.innerHTML = cals.map(function (c) {
-      return '<button type="button" data-cal="' + esc(c.key) + '" aria-pressed="' + c.shown + '" title="' + esc(c.email) + '"><i style="border-color:' + esc(c.color) + ';background:' + esc(c.color) + '"></i>' + esc(c.name) + '</button>';
-    }).join('') +
-      (needs.length ? '<button type="button" class="addcal" data-open-btn="settings"><span class="warn">Reconnect ' + needs.length + ' for calendar</span></button>' : '') +
-      '<button type="button" class="addcal" data-open-btn="settings">+ Calendar</button><span class="gsrc">Tap a calendar to show or hide it</span>';
+    var groups = {};
+    cals.forEach(function (c) { (groups[c.email] = groups[c.email] || []).push(c); });
+    var html = Object.keys(groups).sort(function (a, b) { return a.localeCompare(b); }).map(function (email) {
+      var list = groups[email].slice().sort(function (a, b) { return (b.primary ? 1 : 0) - (a.primary ? 1 : 0) || a.name.localeCompare(b.name); });
+      return '<div class="cgroup"><p class="caddr" title="' + esc(email) + '">' + esc(email).replace('@', '@<wbr>') + '</p>' + list.map(function (c) {
+        return '<button type="button" data-cal="' + esc(c.key) + '" aria-pressed="' + c.shown + '" title="' + (c.shown ? 'Hide ' : 'Show ') + esc(c.name) + '"><i style="border-color:' + esc(c.color) + ';background:' + esc(c.color) + '"></i><span>' + esc(c.primary ? 'Main calendar' : c.name) + '</span></button>';
+      }).join('') + '</div>';
+    }).join('');
+    el.innerHTML = (html || '<p class="caddr">No calendars yet</p>') +
+      (needs.length ? '<button type="button" class="addcal" data-open-btn="settings" data-tab="google"><span class="warn">Reconnect ' + needs.length + ' for calendar</span></button>' : '') +
+      '<button type="button" class="addcal" data-open-btn="settings" data-tab="google">+ Add account</button>';
   }
   $('#legend').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-cal]'); if (!b) return;
@@ -541,7 +549,7 @@
       var sec = function (k, title, line, inner) { return '<section class="ssec" data-ssec="' + k + '"' + (k === tab ? '' : ' hidden') + '><div class="shead"><h3>' + title + '</h3><p>' + line + '</p></div>' + inner + '</section>'; };
 
       var body = '<nav class="stabs" role="tablist" aria-label="Settings sections">' + TABS.map(function (t) {
-        return '<button type="button" role="tab" data-stab="' + t[0] + '" aria-selected="' + (t[0] === tab) + '">' + t[1] + (t[2] ? '<i class="dot ' + t[2] + '"></i>' : '') + '</button>';
+        return '<button type="button" role="tab" data-stab="' + t[0] + '" aria-selected="' + (t[0] === tab) + '">' + t[1] + '</button>';
       }).join('') + '</nav>';
 
       body += sec('google', 'Google accounts', 'Gmail and Google Calendar. Connected once, works on every device.',
@@ -622,7 +630,7 @@
     }
     if (e.target.closest('[data-connect]')) { connectGoogle(); return; }
     var btn = e.target.closest('[data-open-btn]');
-    if (btn) { openView(btn.dataset.openBtn); return; }
+    if (btn) { if (btn.dataset.tab) S.setTab = btn.dataset.tab; openView(btn.dataset.openBtn); return; }
     if (e.target.closest('.ask')) { openView('email'); return; }
     if (e.target.closest('button, a, input, select, label, form, dialog')) return;
     var z = e.target.closest('[data-open]');
