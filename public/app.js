@@ -105,7 +105,7 @@
         .eq('user_id', uid).eq('is_archived', false).in('status', ['new', 'reviewed']).or('category.eq.action_needed,importance.eq.3')
         .order('received_at', { ascending: false }).limit(40),
       sb.from('email_messages').select('id,account_id,category').eq('user_id', uid).gte('received_at', since24).limit(500),
-      sb.from('email_digests').select('summary,digest_date,source,author').order('digest_date', { ascending: false }).limit(1),
+      sb.from('email_digests').select('summary,digest_date,source,author,do_first').order('digest_date', { ascending: false }).limit(1),
       sb.from('daily_checkins').select('plan').eq('user_id', uid).eq('day', todayIso).maybeSingle(),
       sb.from('payhip_stores').select('id,name,company,created_at').order('created_at'),
       sb.from('payhip_sales').select('id,store_id,amount,currency,items,sold_at,refunded').gte('sold_at', monthStart.toISOString()).order('sold_at', { ascending: false }).limit(3000)
@@ -117,6 +117,17 @@
     S.needs = q[3].data || [];
     S.recent = q[4].data || [];
     S.digest = (q[5].data || [])[0] || null;
+    // Once the AI chat has written today's briefing, the list is its do-first emails, in its order, with its reason for
+    // each. Emails archived, dismissed or turned into tasks since then drop off. Before that, the rule-based list above.
+    S.chatList = false;
+    var df = S.digest && S.digest.source === 'chat' && S.digest.digest_date === todayIso && Array.isArray(S.digest.do_first) ? S.digest.do_first : null;
+    if (df) {
+      var ids = df.map(function (d) { return d.message_id; });
+      var got = ids.length ? (await sb.from('email_messages').select('id,account_id,thread_id,from_name,from_address,subject,summary,snippet,received_at,web_link,category,importance,thread_next_steps').in('id', ids).eq('is_archived', false).in('status', ['new', 'reviewed'])).data || [] : [];
+      var byId = {}; got.forEach(function (m) { byId[m.id] = m; });
+      S.needs = df.filter(function (d) { return byId[d.message_id]; }).map(function (d) { var m = byId[d.message_id]; m.why = d.why; return m; });
+      S.chatList = true;
+    }
     S.stores = q[7].data || [];
     S.sales = (q[8].data || []).filter(function (s) { return !s.refunded; });
     await loadTasks(q[6].data, uid, today);
@@ -185,6 +196,7 @@
     renderHeadline(); renderLegend(); renderCal(); renderMail(); renderRows();
   }
 
+  function chatName() { return (S.digest && S.digest.author) || 'ChatGPT'; }
   function needsInView() { return S.needs.filter(function (m) { return inView(mailCo(m.account_id)); }); }
   function tasksInView() { return S.tasks.filter(function (t) { return inView(areaCo(t.life_area_id)); }); }
   function salesInView() { return S.sales.filter(function (s) { return inView(storeCo(s.store_id)); }); }
@@ -288,17 +300,17 @@
   function renderMail() {
     var list = needsInView();
     var fresh = S.recent.filter(function (m) { return inView(mailCo(m.account_id)); }).length;
-    $('#mailSt').textContent = fresh + ' new today';
+    $('#mailSt').textContent = S.chatList ? list.length + ' left from ' + chatName() : fresh + ' new today';
     if (!S.accounts.length) {
       $('#asks').innerHTML = '<div class="empty"><b>No Gmail connected.</b>Connect your Google account once in Settings.<button type="button" class="btnl" data-open-btn="settings">Open Settings</button></div>';
       return;
     }
     var max = innerWidth < 760 ? 2 : 3;
-    $('#asks').innerHTML = '<p class="lead">' + (list.length ? '<span>' + list.length + '</span> need' + (list.length === 1 ? 's' : '') + ' a reply' : 'Nothing needs a reply.') + '</p>' +
+    $('#asks').innerHTML = '<p class="lead">' + (S.chatList ? (list.length ? '<span>' + list.length + '</span> to do first · ' + esc(chatName()) : 'All done from ' + esc(chatName()) + '’s list.') : (list.length ? '<span>' + list.length + '</span> need' + (list.length === 1 ? 's' : '') + ' a reply' : 'Nothing needs a reply.')) + '</p>' +
       list.slice(0, max).map(function (m) {
-        return '<div class="ask" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><span class="tx"><b>' + esc(m.from_name || m.from_address) + ' · ' + esc(m.subject || '(no subject)') + ' ' + (S.view === 'all' ? tag(mailCo(m.account_id)) : '') + '</b><span>' + esc(m.summary || m.snippet || '') + '</span></span><button class="open2" type="button" data-open-btn="email">Open</button></div>';
+        return '<div class="ask" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><span class="tx"><b>' + esc(m.from_name || m.from_address) + ' · ' + esc(m.subject || '(no subject)') + ' ' + (S.view === 'all' ? tag(mailCo(m.account_id)) : '') + '</b><span>' + esc(m.why || m.summary || m.snippet || '') + '</span></span><button class="open2" type="button" data-open-btn="email">Open</button></div>';
       }).join('') +
-      (list.length > max ? '<div class="wait">+' + (list.length - max) + ' more need a reply.</div>' : (S.digest ? '<div class="wait">' + esc(S.digest.summary).slice(0, 160) + '</div>' : ''));
+      (list.length > max ? '<div class="wait">+' + (list.length - max) + (S.chatList ? ' more to do first.' : ' more need a reply.') + '</div>' : (S.digest ? '<div class="wait">' + esc(S.digest.summary).slice(0, 160) + '</div>' : ''));
   }
 
   /* numbers */
@@ -320,7 +332,7 @@
     var tasks = tasksInView(), done = tasks.filter(function (t) { return t.status === 'completed'; }).length;
     var tFor = function (co) { var l = S.tasks.filter(function (t) { var c = areaCo(t.life_area_id); return c === co || c === 'both'; }); return l.filter(function (t) { return t.status === 'completed'; }).length + '/' + l.length; };
     var needs = needsInView().length, fresh = S.recent.filter(function (m) { return inView(mailCo(m.account_id)); }).length;
-    var eFor = function (co) { return S.needs.filter(function (m) { var c = mailCo(m.account_id); return c === co || c === 'both'; }).length + ' to reply'; };
+    var eFor = function (co) { return S.needs.filter(function (m) { var c = mailCo(m.account_id); return c === co || c === 'both'; }).length + (S.chatList ? ' to do first' : ' to reply'); };
     var sn = salesNumbers(cosInView());
     var max = Math.max.apply(null, sn.spark.concat([1]));
     var path = sn.spark.map(function (v, i) { return (i ? 'L' : 'M') + (i * 100 / 13).toFixed(1) + ' ' + (22 - v / max * 20).toFixed(1); }).join(' ');
@@ -328,7 +340,7 @@
       (split(function (co) { return money(salesNumbers([co]).week); }) || '<span>' + money(sn.month) + ' this month' + (sn.pct !== null ? ' <span class="up">' + (sn.pct >= 0 ? '▲' : '▼') + Math.abs(sn.pct) + '%</span>' : '') + '</span>');
     $('#rows').innerHTML =
       '<button class="nr" type="button" data-open-btn="tasks"><span class="ni" style="background:linear-gradient(135deg,#2BB5AE,#126E72)">' + SV + '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/></svg></span><span class="nm"><b>Tasks today</b>' + (split(tFor) || '<span>' + (tasks.length - done) + ' left' + (S.taskSource === 'due' ? ' · due today' : '') + '</span>') + '</span><span class="v num">' + done + '<small>of ' + tasks.length + '</small></span><span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:#1E9E98"></i></span><span class="chev">›</span></button>' +
-      '<button class="nr" type="button" data-open-btn="email"><span class="ni" style="background:linear-gradient(135deg,#FF9A52,#E0602E)">' + SV + '<path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 2h6l1-2h5"/></svg></span><span class="nm"><b>Emails</b>' + (split(eFor) || '<span>' + needs + ' need a reply</span>') + '</span><span class="v num">' + fresh + '<small>new</small></span><span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:#FF8A4C"></i></span><span class="chev">›</span></button>' +
+      '<button class="nr" type="button" data-open-btn="email"><span class="ni" style="background:linear-gradient(135deg,#FF9A52,#E0602E)">' + SV + '<path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 2h6l1-2h5"/></svg></span><span class="nm"><b>Emails</b>' + (split(eFor) || '<span>' + needs + (S.chatList ? ' to do first' : ' need a reply') + '</span>') + '</span><span class="v num">' + fresh + '<small>new</small></span><span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:#FF8A4C"></i></span><span class="chev">›</span></button>' +
       '<button class="nr" type="button" data-open-btn="sales"><span class="ni" style="background:linear-gradient(135deg,#8B6CF0,#5B3FC4)">' + SV + '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg></span><span class="nm"><b>Sales' + (S.stores.length ? '<span class="payhip"><i></i>Payhip live</span>' : '') + '</b>' + salesNote + '</span><span class="v num">' + money(sn.week) + '<small>last 7 days</small></span><svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="#8B6CF0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chev">›</span></button>';
   }
 
@@ -434,13 +446,13 @@
       var body = S.digest ? '<p class="mtext">' + esc(S.digest.summary) + '</p>' : '';
       body += groups.map(function (a) {
         var list = S.needs.filter(function (m) { return m.account_id === a.id; });
-        return '<div><p class="mlabel">' + esc(a.email_address) + ' ' + tag(mailCo(a.id)) + ' · ' + list.length + ' need a reply</p><div class="mlist">' +
+        return '<div><p class="mlabel">' + esc(a.email_address) + ' ' + tag(mailCo(a.id)) + ' · ' + list.length + (S.chatList ? ' to do first' : ' need a reply') + '</p><div class="mlist">' +
           (list.length ? list.map(function (m) {
             var steps = Array.isArray(m.thread_next_steps) ? m.thread_next_steps.slice(0, 2).join(' · ') : '';
             return '<div class="msg" data-msg="' + esc(m.id) + '"><div class="l1"><b>' + esc(m.from_name || m.from_address) + '</b><span>' + esc(m.subject || '(no subject)') + '</span><small>' + new Date(m.received_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '</small></div>' +
-              '<p>' + esc(m.summary || m.snippet || '') + '</p>' + (steps ? '<p><b>Next:</b> ' + esc(steps) + '</p>' : '') +
+              (m.why ? '<p><b>Why first:</b> ' + esc(m.why) + '</p>' : '') + '<p>' + esc(m.summary || m.snippet || '') + '</p>' + (steps ? '<p><b>Next:</b> ' + esc(steps) + '</p>' : '') +
               '<div class="acts2"><a href="' + esc(gmailLink(m)) + '" target="_blank" rel="noopener">Reply in Gmail ↗</a><button type="button" data-archive="' + esc(m.id) + '">Done · archive</button></div></div>';
-          }).join('') : '<div class="msg"><p style="color:var(--muted)">Nothing needs a reply here.</p></div>') + '</div></div>';
+          }).join('') : '<div class="msg"><p style="color:var(--muted)">' + (S.chatList ? 'Nothing left to do first here.' : 'Nothing needs a reply here.') + '</p></div>') + '</div></div>';
       }).join('');
       return { t: 'Gmail', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
     },
