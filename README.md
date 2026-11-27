@@ -10,7 +10,7 @@ One screen for **MaLinda Perry Consulting** and **Happy Girls Don't Do That**, a
 | Numbers | Tasks today, emails, Payhip sales (live) | The Tasks app's database, and Payhip webhooks |
 | Dock | Tasks, Gmail, Calendar, Payhip, Links, website, Settings | |
 
-Every icon and section opens a **view inside the cockpit first**. Tasks and Links show the real apps
+Every icon and section opens a **view inside the cockpit first**, except Tasks and Links, which open the real apps in a new tab, already signed in
 (Momentum at `tasks.malindaperryconsulting.com`, LinkHub at `links.malindaperryconsulting.com`), each in its own look.
 From a view, **Open** goes to the app itself: the website on a computer, the Gmail or Google Calendar app on a phone.
 

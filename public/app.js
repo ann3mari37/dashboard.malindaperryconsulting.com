@@ -1100,6 +1100,8 @@
     if (e.target.closest('[data-connect]')) { connectGoogle(); return; }
     var btn = e.target.closest('[data-open-btn]');
     if (btn && btn.dataset.openBtn === 'links') { openLinks(); return; }
+    // Tasks opens in its own tab like Links. It shares the cockpit's sign-in cookie, so it opens signed in.
+    if (btn && btn.dataset.openBtn === 'tasks') { window.open(C.tasksApp, '_blank', 'noopener'); return; }
     if (btn) { if (btn.dataset.tab) S.setTab = btn.dataset.tab; openView(btn.dataset.openBtn); return; }
     if (e.target.closest('.ask')) { openView('email'); return; }
     if (e.target.closest('button, a, input, select, label, form, dialog')) return;
