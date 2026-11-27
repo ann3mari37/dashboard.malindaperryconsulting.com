@@ -442,7 +442,7 @@
   var APPS = {
     email: { name: 'Gmail', web: 'https://mail.google.com', ios: 'googlegmail://', android: 'intent://#Intent;package=com.google.android.gm;end' },
     calendar: { name: 'Google Calendar', web: 'https://calendar.google.com', ios: 'googlecalendar://', android: 'intent://#Intent;package=com.google.android.calendar;end' },
-    sales: { name: 'Payhip', web: 'https://payhip.com' },
+    sales: { name: 'Payhip', web: 'https://payhip.com/analytics' },
     tasks: { name: 'Tasks', web: C.tasksApp },
     links: { name: 'Links', web: C.linksApp },
     sitempc: { name: 'the MPC website', web: CO.mpc.site },
