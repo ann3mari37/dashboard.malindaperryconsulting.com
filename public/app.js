@@ -125,7 +125,7 @@
       '',
       'Please:',
       '1. Email: call get_inbox, read the threads that matter with read_email_thread, then save_email_briefing with a short summary and a ranked do_first list.',
-      '2. Tasks: call get_today and get_overview. Tell me what is due or overdue, and what I planned for yesterday but didn\'t finish, so it carries over.',
+      '2. Tasks: call get_today and get_overview. Tell me what is due or overdue. get_today also returns yesterday: list what was on yesterday\'s plan but not finished (not_finished) and offer to carry it over, mention what I did finish, and read my end-of-day note.',
       '3. Yesterday: look back at what we talked about yesterday (our chats and anything you remember) and pull out anything that should become a to-do or shape today: promises I made, follow-ups, ideas I said I\'d act on, things I was waiting on.',
       '4. Suggest 3 to 5 things for today that fit around my calendar, counting the carry-overs and anything from yesterday\'s conversations. Keep my pinned first thing first.',
       '5. Give me one short plan for the day: which emails to answer first, my tasks in order, and when to do them between meetings, for MaLinda Perry Consulting and Happy Girls Don\'t Do That.',
