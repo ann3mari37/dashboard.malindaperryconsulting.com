@@ -198,6 +198,8 @@
     renderHeadline(); renderLegend(); renderCal(); renderMail(); renderRows();
   }
 
+  // The chat writes email chips as [[email:<id>|Dana · Document review]]; show just the label.
+  function plainSummary(t) { return String(t || '').replace(/[[email:[^|]]*|([^]]*)]]/g, '$1'); }
   function chatName() { return (S.digest && S.digest.author) || 'ChatGPT'; }
   function needsInView() { return S.needs.filter(function (m) { return inView(mailCo(m.account_id)); }); }
   function tasksInView() { return S.tasks.filter(function (t) { return inView(areaCo(t.life_area_id)); }); }
@@ -307,12 +309,13 @@
       $('#asks').innerHTML = '<div class="empty"><b>No Gmail connected.</b>Connect your Google account once in Settings.<button type="button" class="btnl" data-open-btn="settings">Open Settings</button></div>';
       return;
     }
-    var max = innerWidth < 760 ? 2 : 3;
+    var max = (innerWidth < 760 ? 2 : 3) - (S.chatList && S.digest.summary ? 1 : 0);
     $('#asks').innerHTML = '<p class="lead">' + (S.chatList ? (list.length ? '<span>' + list.length + '</span> to do first · ' + esc(chatName()) : 'All done from ' + esc(chatName()) + '’s list.') : (list.length ? '<span>' + list.length + '</span> need' + (list.length === 1 ? 's' : '') + ' a reply' : 'Nothing needs a reply.') + ' <small>· ChatGPT hasn’t sorted today’s email yet</small>') + '</p>' +
+      (S.chatList && S.digest.summary ? '<div class="wait">' + esc(plainSummary(S.digest.summary).slice(0, 220)) + '</div>' : '') +
       list.slice(0, max).map(function (m) {
         return '<div class="ask" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><span class="tx"><b>' + esc(m.from_name || m.from_address) + ' · ' + esc(m.subject || '(no subject)') + ' ' + (S.view === 'all' ? tag(mailCo(m.account_id)) : '') + '</b><span>' + esc(m.why || m.summary || m.snippet || '') + '</span></span><button class="open2" type="button" data-open-btn="email">Open</button></div>';
       }).join('') +
-      (list.length > max ? '<div class="wait">+' + (list.length - max) + (S.chatList ? ' more to do first.' : ' more need a reply.') + '</div>' : (S.digest ? '<div class="wait">' + esc(S.digest.summary).slice(0, 160) + '</div>' : ''));
+      (list.length > max ? '<div class="wait">+' + (list.length - max) + (S.chatList ? ' more to do first.' : ' more need a reply.') + '</div>' : (S.digest && !S.chatList ? '<div class="wait">' + esc(plainSummary(S.digest.summary).slice(0, 160)) + '</div>' : ''));
   }
 
   /* numbers */
@@ -445,7 +448,7 @@
     },
     email: function () {
       var groups = S.accounts.filter(function (a) { return inView(mailCo(a.id)); });
-      var body = S.digest ? '<p class="mtext">' + esc(S.digest.summary) + '</p>' : '';
+      var body = S.digest ? '<p class="mtext">' + esc(plainSummary(S.digest.summary)) + '</p>' : '';
       body += groups.map(function (a) {
         var list = S.needs.filter(function (m) { return m.account_id === a.id; });
         return '<div><p class="mlabel">' + esc(a.email_address) + ' ' + tag(mailCo(a.id)) + ' · ' + list.length + (S.chatList ? ' to do first' : ' need a reply') + '</p><div class="mlist">' +
@@ -456,7 +459,7 @@
               '<div class="acts2"><a href="' + esc(gmailLink(m)) + '" target="_blank" rel="noopener">Reply in Gmail ↗</a><button type="button" data-archive="' + esc(m.id) + '">Done · archive</button></div></div>';
           }).join('') : '<div class="msg"><p style="color:var(--muted)">' + (S.chatList ? 'Nothing left to do first here.' : 'Nothing needs a reply here.') + '</p></div>') + '</div></div>';
       }).join('');
-      return { t: 'Gmail', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
+      return { t: 'ChatGPT’s summary', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
     },
     sales: function () {
       var body = '<div class="mstats">' + salesCos().map(function (co) { var n = salesNumbers([co]); return '<div class="mstat"><span>' + esc(CO[co].short) + ' last 7 days</span><b class="num">' + money(n.week) + '</b><span>' + n.wn + ' sale' + (n.wn === 1 ? '' : 's') + '</span></div><div class="mstat"><span>' + esc(CO[co].short) + ' this month</span><b class="num">' + money(n.month) + '</b><span>' + (n.pct === null ? 'first month' : (n.pct >= 0 ? '▲' : '▼') + Math.abs(n.pct) + '% vs last month') + '</span></div>'; }).join('') + '</div>';
