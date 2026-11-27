@@ -127,8 +127,10 @@
       '1. Email: call get_inbox, read the threads that matter with read_email_thread, then save_email_briefing with a short summary and a ranked do_first list.',
       '2. Tasks: call get_today and get_overview. Tell me what is due or overdue. get_today also returns yesterday: list what was on yesterday\'s plan but not finished (not_finished) and offer to carry it over, mention what I did finish, and read my end-of-day note.',
       '3. Yesterday: look back at what we talked about yesterday (our chats and anything you remember) and pull out anything that should become a to-do or shape today: promises I made, follow-ups, ideas I said I\'d act on, things I was waiting on.',
-      '4. Suggest 3 to 5 things for today that fit around my calendar, counting the carry-overs and anything from yesterday\'s conversations. Keep my pinned first thing first.',
-      '5. Give me one short plan for the day: which emails to answer first, my tasks in order, and when to do them between meetings, for MaLinda Perry Consulting and Happy Girls Don\'t Do That.',
+      '4. Check in with me before planning. Ask: is there anything else on my list I need to get done today that isn\'t in Momentum yet? And do I have any appointments or commitments that aren\'t on the calendar above (another calendar, a paper planner, something I agreed to by text or phone)? Wait for my answer.',
+      '5. Cross-reference what I tell you with my calendar and my tasks: point out anything that overlaps or doesn\'t leave enough time, and offer to add new to-dos to Momentum.',
+      '6. Then suggest 3 to 5 things for today that fit around all of my appointments, counting the carry-overs, anything from yesterday\'s conversations and what I just told you. Keep my pinned first thing first.',
+      '7. Give me one short plan for the day: which emails to answer first, my tasks in order, and when to do them between meetings, for MaLinda Perry Consulting and Happy Girls Don\'t Do That.',
       'Ask me before adding, completing or changing anything.'
     ].join('\n');
   }
