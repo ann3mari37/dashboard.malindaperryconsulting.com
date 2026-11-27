@@ -388,7 +388,7 @@
     });
     el.innerHTML = html;
     var nx = timed.filter(function (e) { return e.s > now && e.s < addDays(start, 1); }).sort(function (a, b) { return a.s - b.s; })[0];
-    $('#calNext').textContent = nx ? 'Next: ' + nx.title + ' at ' + fmtTime(nx.s) : 'Nothing else today';
+    $('#calNext').textContent = nx ? ' · Next: ' + nx.title + ' at ' + fmtTime(nx.s) : ' · Nothing else today';
   }
   function calOf(e) { return S.cals.find(function (x) { return x.key === e.key; }) || { color: '#2F7FD0', name: 'Calendar' }; }
   function tint(hex) { // a light background version of a calendar color
@@ -416,21 +416,29 @@
   }
   function renderMail() {
     var list = needsInView();
-    var fresh = S.recent.filter(function (m) { return inView(mailCo(m.account_id)); }).length;
-    $('#mailSt').textContent = S.chatList ? list.length + ' left from ' + chatName() : fresh + ' new today';
     if (!S.accounts.length) {
       $('#asks').innerHTML = '<div class="empty"><b>No Gmail connected.</b>Connect your Google account once in Settings.<button type="button" class="btnl" data-open-btn="settings">Open Settings</button></div>';
       return;
     }
-    var max = (innerWidth < 760 ? 2 : 3) - (S.chatList && S.digest.summary ? 1 : 0) - (S.chatList ? 0 : 1);
-    $('#asks').innerHTML = '<p class="lead">' + (S.chatList ? (list.length ? '<span>' + list.length + '</span> to do first · ' + esc(chatName()) : 'All done from ' + esc(chatName()) + '’s list.') : (list.length ? '<span>' + list.length + '</span> need' + (list.length === 1 ? 's' : '') + ' a reply' : 'Nothing needs a reply.')) + '</p>' + (S.chatList ? '' : sodCta()) +
-      (S.chatList && S.digest.summary ? '<div class="wait">' + esc(plainSummary(S.digest.summary).slice(0, 220)) + '</div>' : '') +
-      list.slice(0, max).map(function (m) {
+    // Every email that needs her, in a list that scrolls inside the section (the screen itself never scrolls).
+    // The count stays above the list, and See all opens the full Inbox view.
+    $('#asks').innerHTML = (S.chatList ? '' : sodCta()) +
+      (S.chatList && S.digest.summary ? '<p class="isum">' + esc(plainSummary(S.digest.summary)) + '</p>' : '') +
+      '<p class="glab">' + (S.chatList ? 'To do first · ' + list.length + '<span> from ' + esc(chatName()) + '</span>' : 'Needs a reply · ' + list.length) + '</p>' +
+      (list.length ? '<div class="ibl" id="ibl">' + list.map(function (m) {
         var more = m.why || m.summary || m.snippet || '';
         return '<div class="ask gm" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><span class="tx"><span class="r1"><b class="from" title="' + esc(m.from_address || '') + '">' + esc(sender(m)) + '</b>' + (S.view === 'all' ? tag(mailCo(m.account_id)) : '') + '<time>' + esc(gmTime(m.received_at)) + '</time></span><span class="r2"><b>' + esc(m.subject || '(no subject)') + '</b>' + (more ? '<span> – ' + esc(more) + '</span>' : '') + '</span></span><button class="open2" type="button" data-open-btn="email">Open</button></div>';
-      }).join('') +
-      (list.length > max ? '<div class="wait">+' + (list.length - max) + (S.chatList ? ' more to do first.' : ' more need a reply.') + '</div>' : (S.digest && !S.chatList ? '<div class="wait">' + esc(plainSummary(S.digest.summary).slice(0, 160)) + '</div>' : ''));
+      }).join('') + '</div>' : '<div class="inone">' + (S.chatList ? 'All done from ' + esc(chatName()) + '’s list.' : 'Nothing needs a reply right now.') + '</div>') +
+      '<button type="button" class="seeall" data-open-btn="email">' + (list.length ? 'See all ' + list.length + ' in Inbox' : 'Open Inbox') + ' <span aria-hidden="true">›</span></button>';
+    fadeList();
   }
+  // A soft fade at the list's bottom edge while there is more to scroll to.
+  function fadeList() {
+    var l = $('#ibl'); if (!l) return;
+    var f = function () { l.classList.toggle('more', l.scrollTop + l.clientHeight < l.scrollHeight - 4); };
+    l.onscroll = f; f();
+  }
+  window.addEventListener('resize', function () { fadeList(); });
 
   /* numbers */
   function salesNumbers(cos) {
@@ -446,22 +454,33 @@
     return { today: sum(d0, addDays(d0, 1)), n: cnt, week: wList.reduce(function (a, s) { return a + Number(s.amount); }, 0), wn: wList.length, month: month, prev: prev, pct: prev ? Math.round((month - prev) / prev * 100) : null, spark: spark };
   }
   function renderRows() {
-    var SV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
-    var split = function (fn) { return S.view === 'all' ? '<span class="split">' + ['mpc', 'hg'].map(function (co) { return '<span><b>' + esc(CO[co].short) + '</b> ' + fn(co) + '</span>'; }).join('') + '</span>' : ''; };
+    var both = S.view === 'all';
+    var perCo = function (fn) { return ['mpc', 'hg'].map(function (co) { return esc(CO[co].short) + ' ' + fn(co); }).join(' · '); };
+    var line = function (kind, name, sub, value, unit, extra) {
+      return '<button class="nr" type="button" data-open-btn="' + kind + '"><span class="ni" style="background:' + KINDS[kind].bg + '">' + kSvg(kind) + '</span>' +
+        '<span class="nm"><b>' + name + '</b><span>' + sub + '</span></span><span class="v num">' + value + '<small class="under">' + unit + '</small></span>' + extra + '<span class="chev">›</span></button>';
+    };
+    // Tasks: how many of today's are done
     var tasks = tasksInView(), done = tasks.filter(function (t) { return t.status === 'completed'; }).length;
-    var tFor = function (co) { var l = S.tasks.filter(function (t) { var c = areaCo(t.life_area_id); return c === co || c === 'both'; }); return l.filter(function (t) { return t.status === 'completed'; }).length + '/' + l.length; };
+    var tOf = function (co) { var l = S.tasks.filter(function (t) { var c = areaCo(t.life_area_id); return c === co || c === 'both'; }); return l.filter(function (t) { return t.status === 'completed'; }).length + ' of ' + l.length; };
+    var tSub = both ? perCo(tOf) : (tasks.length - done) + ' still to do' + (S.taskSource === 'due' ? ' (due today)' : '');
+    // Email: new today, and how many need her
     var needs = needsInView().length, fresh = S.recent.filter(function (m) { return inView(mailCo(m.account_id)); }).length;
-    var eFor = function (co) { return S.needs.filter(function (m) { var c = mailCo(m.account_id); return c === co || c === 'both'; }).length + (S.chatList ? ' to do first' : ' to reply'); };
+    var verb = S.chatList ? ' to do first' : ' need a reply';
+    var eOf = function (co) { return S.needs.filter(function (m) { var c = mailCo(m.account_id); return c === co || c === 'both'; }).length; };
+    var eSub = needs + verb + (both && needs ? ' (' + perCo(eOf) + ')' : '');
+    // Sales: today, with the last 7 days under it
     var sn = salesNumbers(cosInView());
     var max = Math.max.apply(null, sn.spark.concat([1]));
     var path = sn.spark.map(function (v, i) { return (i ? 'L' : 'M') + (i * 100 / 13).toFixed(1) + ' ' + (22 - v / max * 20).toFixed(1); }).join(' ');
-    var salesNote = !S.stores.length ? '<span>Add your Payhip stores in Settings</span>' :
-      (salesCos().length > 1 && split(function (co) { return money(salesNumbers([co]).week); }) || '<span>' + money(sn.month) + ' this month' + (sn.pct !== null ? ' <span class="up">' + (sn.pct >= 0 ? '▲' : '▼') + Math.abs(sn.pct) + '%</span>' : '') + '</span>');
+    var sSub = !S.stores.length ? 'Add your Payhip stores in Settings' :
+      money(sn.week) + ' in the last 7 days' + (salesCos().length > 1 ? ' (' + salesCos().map(function (co) { return esc(CO[co].short) + ' ' + money(salesNumbers([co]).week); }).join(' · ') + ')' : (sn.pct !== null ? ' <span class="up">' + (sn.pct >= 0 ? '▲' : '▼') + Math.abs(sn.pct) + '% this month</span>' : ''));
     $('#rows').innerHTML =
-      '<button class="nr" type="button" data-open-btn="tasks"><span class="ni" style="background:' + KINDS.tasks.bg + '">' + kSvg('tasks') + '</span><span class="nm"><b>Tasks today</b>' + (split(tFor) || '<span>' + (tasks.length - done) + ' left' + (S.taskSource === 'due' ? ' · due today' : '') + '</span>') + '</span><span class="v num">' + done + '<small>of ' + tasks.length + '</small></span><span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:' + KINDS.tasks.solid + '"></i></span><span class="chev">›</span></button>' +
-      '<button class="nr" type="button" data-open-btn="email"><span class="ni" style="background:' + KINDS.email.bg + '">' + kSvg('email') + '</span><span class="nm"><b>Emails</b>' + (split(eFor) || '<span>' + needs + (S.chatList ? ' to do first' : ' need a reply') + '</span>') + '</span><span class="v num">' + fresh + '<small>new</small></span><span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:' + KINDS.email.solid + '"></i></span><span class="chev">›</span></button>' +
-      '<button class="nr" type="button" data-open-btn="sales"><span class="ni" style="background:' + KINDS.sales.bg + '">' + kSvg('sales') + '</span><span class="nm"><b>Sales' + (S.stores.length ? '<span class="payhip"><i></i>Payhip live</span>' : '') + '</b>' + salesNote + '</span><span class="v num">' + money(sn.today) + '<small class="under">' + money(sn.week) + ' last 7 days</small></span><svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="' + KINDS.sales.solid + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chev">›</span></button>';
+      line('tasks', 'Tasks', tSub, done + '<small> of ' + tasks.length + '</small>', 'done today', '<span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:' + KINDS.tasks.solid + '"></i></span>') +
+      line('email', 'Email', eSub, String(fresh), 'new today', '<span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:' + KINDS.email.solid + '"></i></span>') +
+      line('sales', 'Sales' + (S.stores.length ? '<span class="payhip"><i></i>Payhip live</span>' : ''), sSub, money(sn.today), 'today', '<svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="' + KINDS.sales.solid + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
   }
+
 
   /* ---------------- company switch ---------------- */
   $('#coSwitch').addEventListener('click', function (e) {
@@ -983,7 +1002,7 @@
             '<p>' + esc(m.summary || m.snippet || '') + '</p>' + gmailActs(m, 'Open in Gmail') + '</div>';
         }).join('') : '<div class="msg"><p style="color:var(--muted)">No new mail in the last 24 hours.</p></div>') + '</div></div>';
       body += gmailHelp(groups);
-      return { t: 'ChatGPT’s summary', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
+      return { t: 'Inbox', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
     },
     sales: function () {
       var body = '<div class="mstats">' + salesCos().map(function (co) { var n = salesNumbers([co]); return '<div class="mstat"><span>' + esc(CO[co].short) + ' today</span><b class="num">' + money(n.today) + '</b><span>' + money(n.week) + ' last 7 days · ' + n.wn + ' sale' + (n.wn === 1 ? '' : 's') + '</span></div><div class="mstat"><span>' + esc(CO[co].short) + ' this month</span><b class="num">' + money(n.month) + '</b><span>' + (n.pct === null ? 'first month' : (n.pct >= 0 ? '▲' : '▼') + Math.abs(n.pct) + '% vs last month') + '</span></div>'; }).join('') + '</div>';
