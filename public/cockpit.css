@@ -369,3 +369,11 @@ a.btnl,label.btnl{display:inline-flex;align-items:center;text-decoration:none;co
 .calzone.side-closed .calbody{grid-template-columns:minmax(0,1fr)}
 .calzone.side-closed .legend{display:none}
 @media (max-width:760px){.calbody{grid-template-columns:minmax(0,1fr)}.calsbtn[aria-expanded=true]{background:var(--white)}}
+/* Calendar side menu with its own ☰ button (collapsed: only the button stays) */
+.calside{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
+.calside .legend{border-right:0;flex:1;padding-top:.2rem}
+.menubtn{align-self:flex-start;flex:0 0 auto;margin:.5rem .45rem .1rem;width:2.2rem;height:2.2rem;border-radius:.6rem;border:0;background:none;font-size:1.15rem;line-height:1;color:var(--ink);cursor:pointer}
+.menubtn:hover{background:var(--cream)}
+.calzone.side-closed .calbody{grid-template-columns:3.1rem minmax(0,1fr)}
+.calsbtn{display:none}
+@media (max-width:760px){.calside{display:none}.calbody,.calzone.side-closed .calbody{grid-template-columns:minmax(0,1fr)}.calsbtn{display:inline-flex}}

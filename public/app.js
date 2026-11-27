@@ -281,19 +281,16 @@
       (needs.length ? '<button type="button" class="addcal" data-open-btn="settings" data-tab="google"><span class="warn">Reconnect ' + needs.length + ' for calendar</span></button>' : '') +
       '<button type="button" class="addcal" data-open-btn="settings" data-tab="google">+ Add account</button>';
   }
-  // The calendar list collapses with the Calendars button; the choice is kept on this device. On a phone there's no
-  // room for it, so the button opens Settings on the Calendars tab instead.
+  // The calendar list is a side menu with its own ☰ button, like a classic menu; when collapsed only that button
+  // stays. The choice is kept on this device. On a phone there's no room for it: a Calendars button opens Settings.
   var SIDE_KEY = 'cockpit.calSide';
   function setCalSide(open) {
     $('.calzone').classList.toggle('side-closed', !open);
-    $('#calSideBtn').setAttribute('aria-expanded', String(open));
+    var mb = $('#calMenuBtn'); mb.setAttribute('aria-expanded', String(open)); mb.title = open ? 'Hide calendars' : 'Show calendars'; mb.setAttribute('aria-label', mb.title);
     try { localStorage.setItem(SIDE_KEY, open ? '1' : '0'); } catch (e) { /* not kept */ }
   }
   (function () { var v = null; try { v = localStorage.getItem(SIDE_KEY); } catch (e) { /* default */ } setCalSide(v !== '0'); })();
-  $('#calSideBtn').addEventListener('click', function () {
-    if (innerWidth <= 760) { S.setTab = 'calendars'; openView('settings'); return; }
-    setCalSide($('.calzone').classList.contains('side-closed'));
-  });
+  $('#calMenuBtn').addEventListener('click', function () { setCalSide($('.calzone').classList.contains('side-closed')); });
   $('#legend').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-cal]'); if (!b) return;
     var c = S.cals.find(function (x) { return x.key === b.dataset.cal; }); if (!c) return;
@@ -606,6 +603,17 @@
     }
   };
 
+  // Links opens LinkHub in a new tab, already signed in: the Tasks Worker gives the signed-in owner a one-time pass
+  // (good once, for two minutes). The tab is opened at the click so the browser doesn't block it, then sent on.
+  // If no pass comes back, the tab shows LinkHub's normal sign-in.
+  async function openLinks() {
+    var w = window.open('about:blank', '_blank');
+    if (w) w.opener = null;
+    var to = C.linksApp;
+    try { to = (await api('/api/links/handoff')).url || to; } catch (e) { /* normal sign-in */ }
+    if (w) w.location.href = to; else location.href = to;
+  }
+
   var modal = $('#modal');
   function openView(k) {
     var v = VIEWS[k] && VIEWS[k](); if (!v) return;
@@ -643,6 +651,7 @@
     }
     if (e.target.closest('[data-connect]')) { connectGoogle(); return; }
     var btn = e.target.closest('[data-open-btn]');
+    if (btn && btn.dataset.openBtn === 'links') { openLinks(); return; }
     if (btn) { if (btn.dataset.tab) S.setTab = btn.dataset.tab; openView(btn.dataset.openBtn); return; }
     if (e.target.closest('.ask')) { openView('email'); return; }
     if (e.target.closest('button, a, input, select, label, form, dialog')) return;
