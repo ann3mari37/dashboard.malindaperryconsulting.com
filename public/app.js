@@ -478,7 +478,8 @@
     var max = Math.max.apply(null, sn.spark.concat([1]));
     var path = sn.spark.map(function (v, i) { return (i ? 'L' : 'M') + (i * 100 / 13).toFixed(1) + ' ' + (22 - v / max * 20).toFixed(1); }).join(' ');
     var sSub = !S.stores.length ? 'Add your Payhip stores in Settings' :
-      money(sn.week) + ' in the last 7 days' + (salesCos().length > 1 ? ' (' + salesCos().map(function (co) { return esc(CO[co].short) + ' ' + money(salesNumbers([co]).week); }).join(' · ') + ')' : (sn.pct !== null ? ' <span class="up">' + (sn.pct >= 0 ? '▲' : '▼') + Math.abs(sn.pct) + '% this month</span>' : ''));
+      // Highlighted when there were sales in the last 7 days
+      (sn.week > 0 ? '<span class="wk7">' + money(sn.week) + ' in the last 7 days</span>' : money(sn.week) + ' in the last 7 days') + (salesCos().length > 1 ? ' (' + salesCos().map(function (co) { return esc(CO[co].short) + ' ' + money(salesNumbers([co]).week); }).join(' · ') + ')' : (sn.pct !== null ? ' <span class="up">' + (sn.pct >= 0 ? '▲' : '▼') + Math.abs(sn.pct) + '% this month</span>' : ''));
     $('#rows').innerHTML =
       line('tasks', 'Tasks', tSub, done + '<small> of ' + tasks.length + '</small>', 'done today', '<span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:' + KINDS.tasks.solid + '"></i></span>') +
       line('email', 'Email', eSub, String(fresh), 'new today', '<span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:' + KINDS.email.solid + '"></i></span>') +
