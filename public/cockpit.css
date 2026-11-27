@@ -123,6 +123,7 @@ a{color:inherit;text-decoration:none}
 .nr .nm > span{display:block;font-size:.75rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nr .v{font-size:1.6rem;font-weight:800;letter-spacing:-.04em;white-space:nowrap}
 .nr .v small{font-size:.75rem;font-weight:600;letter-spacing:0;color:var(--muted);margin-left:.2rem}
+.nr .v small.under{display:block;margin:.1rem 0 0;text-align:right;letter-spacing:0}
 .nr .mini{height:1.6rem;width:100%}
 .nr .bar{height:.45rem;border-radius:999px;background:rgba(16,41,44,.08);overflow:hidden}
 .nr .bar i{display:block;height:100%;border-radius:999px}

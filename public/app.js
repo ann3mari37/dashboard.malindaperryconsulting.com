@@ -227,7 +227,7 @@
       S.calError = e.message;
     }
     S.calLoaded = true;
-    renderLegend(); renderCal(); renderHeadline();
+    renderLegend(); renderCal();
   }
 
   /* ---------------- render ---------------- */
@@ -236,7 +236,7 @@
   }
   function renderAll() {
     document.querySelectorAll('#coSwitch button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.co === S.view)); });
-    renderHeadline(); renderLegend(); renderCal(); renderMail(); renderRows();
+    renderLegend(); renderCal(); renderMail(); renderRows();
   }
 
   // The chat writes email chips as [[email:<id>|Dana · Document review]]; show just the label.
@@ -247,18 +247,6 @@
   function salesInView() { return S.sales.filter(function (s) { return inView(storeCo(s.store_id)); }); }
   function eventsInView() {
     return S.events.filter(function (e) { var c = S.cals.find(function (x) { return x.key === e.key; }); return c && c.shown && inView(calCo(e.account_id, e.calendar_id)); });
-  }
-
-  function renderHeadline() {
-    var h = new Date().getHours(), greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-    var parts = [];
-    var n = needsInView().length;
-    if (n) parts.push('<b>' + n + ' email' + (n === 1 ? '' : 's') + ' need' + (n === 1 ? 's' : '') + ' a reply</b>');
-    var now = new Date(), next = eventsInView().filter(function (e) { return !e.all_day && e.s > now && e.s < addDays(startOfDay(now), 1); }).sort(function (a, b) { return a.s - b.s; })[0];
-    if (next) parts.push('next up: ' + esc(next.title) + ' at ' + fmtTime(next.s));
-    var today = salesInView().filter(function (s) { return new Date(s.sold_at) >= startOfDay(now); }).reduce(function (t, s) { return t + Number(s.amount); }, 0);
-    if (S.stores.length) parts.push(money(today) + ' in sales today');
-    $('#headline').innerHTML = greet + ', MaLinda. ' + (parts.length ? parts.join(', ') + '.' : 'Nothing urgent right now.');
   }
 
   /* calendar */
@@ -278,7 +266,7 @@
     var c = S.cals.find(function (x) { return x.key === b.dataset.cal; }); if (!c) return;
     c.shown = !c.shown;
     saveSource('calendar', c.key, { shown: c.shown, company: calCo(c.account_id, c.id) }).then(function () { if (c.shown) loadCalendar(); });
-    renderLegend(); renderCal(); renderHeadline();
+    renderLegend(); renderCal();
   });
 
   function renderCal() {
@@ -387,7 +375,7 @@
     $('#rows').innerHTML =
       '<button class="nr" type="button" data-open-btn="tasks"><span class="ni" style="background:linear-gradient(135deg,#2BB5AE,#126E72)">' + SV + '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/></svg></span><span class="nm"><b>Tasks today</b>' + (split(tFor) || '<span>' + (tasks.length - done) + ' left' + (S.taskSource === 'due' ? ' · due today' : '') + '</span>') + '</span><span class="v num">' + done + '<small>of ' + tasks.length + '</small></span><span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:#1E9E98"></i></span><span class="chev">›</span></button>' +
       '<button class="nr" type="button" data-open-btn="email"><span class="ni" style="background:linear-gradient(135deg,#FF9A52,#E0602E)">' + SV + '<path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 2h6l1-2h5"/></svg></span><span class="nm"><b>Emails</b>' + (split(eFor) || '<span>' + needs + (S.chatList ? ' to do first' : ' need a reply') + '</span>') + '</span><span class="v num">' + fresh + '<small>new</small></span><span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:#FF8A4C"></i></span><span class="chev">›</span></button>' +
-      '<button class="nr" type="button" data-open-btn="sales"><span class="ni" style="background:linear-gradient(135deg,#8B6CF0,#5B3FC4)">' + SV + '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg></span><span class="nm"><b>Sales' + (S.stores.length ? '<span class="payhip"><i></i>Payhip live</span>' : '') + '</b>' + salesNote + '</span><span class="v num">' + money(sn.week) + '<small>last 7 days</small></span><svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="#8B6CF0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chev">›</span></button>';
+      '<button class="nr" type="button" data-open-btn="sales"><span class="ni" style="background:linear-gradient(135deg,#8B6CF0,#5B3FC4)">' + SV + '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg></span><span class="nm"><b>Sales' + (S.stores.length ? '<span class="payhip"><i></i>Payhip live</span>' : '') + '</b>' + salesNote + '</span><span class="v num">' + money(sn.today) + '<small class="under">' + money(sn.week) + ' last 7 days</small></span><svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="#8B6CF0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chev">›</span></button>';
   }
 
   /* ---------------- company switch ---------------- */
@@ -510,7 +498,7 @@
       return { t: 'ChatGPT’s summary', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
     },
     sales: function () {
-      var body = '<div class="mstats">' + salesCos().map(function (co) { var n = salesNumbers([co]); return '<div class="mstat"><span>' + esc(CO[co].short) + ' last 7 days</span><b class="num">' + money(n.week) + '</b><span>' + n.wn + ' sale' + (n.wn === 1 ? '' : 's') + '</span></div><div class="mstat"><span>' + esc(CO[co].short) + ' this month</span><b class="num">' + money(n.month) + '</b><span>' + (n.pct === null ? 'first month' : (n.pct >= 0 ? '▲' : '▼') + Math.abs(n.pct) + '% vs last month') + '</span></div>'; }).join('') + '</div>';
+      var body = '<div class="mstats">' + salesCos().map(function (co) { var n = salesNumbers([co]); return '<div class="mstat"><span>' + esc(CO[co].short) + ' today</span><b class="num">' + money(n.today) + '</b><span>' + money(n.week) + ' last 7 days · ' + n.wn + ' sale' + (n.wn === 1 ? '' : 's') + '</span></div><div class="mstat"><span>' + esc(CO[co].short) + ' this month</span><b class="num">' + money(n.month) + '</b><span>' + (n.pct === null ? 'first month' : (n.pct >= 0 ? '▲' : '▼') + Math.abs(n.pct) + '% vs last month') + '</span></div>'; }).join('') + '</div>';
       var m0 = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       var prod = {};
       salesInView().filter(function (s) { return new Date(s.sold_at) >= m0; }).forEach(function (s) { var k = (s.items && s.items.length ? s.items.join(', ') : 'Sale') + '|' + storeCo(s.store_id); prod[k] = prod[k] || { n: 0, amt: 0 }; prod[k].n++; prod[k].amt += Number(s.amount); });
@@ -629,7 +617,7 @@
       try {
         await api('/api/email/modify', { message_ids: [arc.dataset.archive], op: 'archive' });
         S.needs = S.needs.filter(function (m) { return m.id !== arc.dataset.archive; });
-        arc.closest('.msg').remove(); renderMail(); renderRows(); renderHeadline(); toast('Archived in Gmail.');
+        arc.closest('.msg').remove(); renderMail(); renderRows(); toast('Archived in Gmail.');
       } catch (err) { toast('Couldn’t archive it.'); }
     }
   });
@@ -639,7 +627,7 @@
     try {
       sb.channel('cockpit-sales').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payhip_sales' }, function (p) {
         var s = p.new; if (!s || s.refunded) return;
-        S.sales.unshift(s); renderRows(); renderHeadline();
+        S.sales.unshift(s); renderRows();
         toast('New sale: ' + money(Number(s.amount)) + ((s.items || []).length ? ' · ' + s.items[0] : ''));
       }).subscribe();
     } catch (e) { /* live updates are a bonus; the page refreshes every 5 minutes anyway */ }
