@@ -68,7 +68,48 @@
       if (document.visibilityState === 'visible' && Date.now() - last > 2 * 60 * 1000) { last = Date.now(); loadData(); syncMail(); }
     });
     subscribeSales();
+    maybeAskStartDay();
   }
+
+  /* ---------------- start my day ---------------- */
+  // ChatGPT can't be shown inside the page, so "Start my day" opens it in a new tab with the prompt filled in. The
+  // prompt carries today's calendar (the connector has no calendar tool) and asks ChatGPT to use the Momentum
+  // connector for email and tasks. Asked once a day: not again after Start or Not now on this device, or once the
+  // day has been started (a plan in Tasks, or ChatGPT's briefing saved today).
+  var SOD_KEY = 'cockpit.startDay';
+  function sodSeen() { try { return localStorage.getItem(SOD_KEY) === isoDay(new Date()); } catch (e) { return false; } }
+  function sodMark() { try { localStorage.setItem(SOD_KEY, isoDay(new Date())); } catch (e) { /* asks again next load */ } }
+  function maybeAskStartDay() {
+    var started = S.taskSource === 'plan' || S.chatList;
+    if (started || sodSeen() || new Date().getHours() < 4) return;
+    var d = $('#sod'); if (d && !d.open && d.showModal) d.showModal();
+  }
+  function startDayPrompt() {
+    var now = new Date(), d0 = startOfDay(now), d1 = addDays(d0, 1);
+    var evs = (S.events || []).filter(function (e) { return e.s < d1 && e.e > d0; }).sort(function (a, b) { return a.s - b.s; }).slice(0, 15);
+    var cal = evs.length ? evs.map(function (e) { return '- ' + (e.all_day ? 'All day' : fmtTime(e.s) + '–' + fmtTime(e.e)) + ': ' + e.title + ' (' + calOf(e).name + ')'; }).join('\n') : '- Nothing scheduled';
+    return [
+      'Start my day. Use the Momentum connector.',
+      'Today is ' + now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) + '.',
+      '',
+      'My calendar today:',
+      cal,
+      '',
+      'Please:',
+      '1. Email: call get_inbox, read the threads that matter with read_email_thread, then save_email_briefing with a short summary and a ranked do_first list.',
+      '2. Tasks: call get_today and get_overview. Tell me what is due or overdue, and suggest 3 to 5 things for today that fit around my calendar. Keep my pinned first thing first.',
+      '3. Give me one short plan for the day: which emails to answer first, my tasks in order, and when to do them between meetings, for MaLinda Perry Consulting and Happy Girls Don\'t Do That.',
+      'Ask me before adding, completing or changing anything.'
+    ].join('\n');
+  }
+  function startDay() {
+    window.open('https://chatgpt.com/?q=' + encodeURIComponent(startDayPrompt()), '_blank', 'noopener');
+    sodMark();
+    var d = $('#sod'); if (d && d.open) d.close();
+  }
+  $('#sodGo').addEventListener('click', startDay);
+  $('#sodBtn').addEventListener('click', startDay);
+  $('#sodLater').addEventListener('click', function () { sodMark(); $('#sod').close(); });
   function showSignIn() { $('#app').hidden = true; $('#signin').hidden = false; setTimeout(function () { $('#siEmail').focus(); }, 50); }
   $('#signinForm').addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -106,7 +147,7 @@
       sb.from('email_messages').select('id,account_id,thread_id,from_name,from_address,subject,summary,snippet,received_at,web_link,category,importance,thread_next_steps')
         .eq('user_id', uid).eq('is_archived', false).in('status', ['new', 'reviewed']).or('category.eq.action_needed,importance.eq.3')
         .order('received_at', { ascending: false }).limit(40),
-      sb.from('email_messages').select('id,account_id,category').eq('user_id', uid).gte('received_at', since24).limit(500),
+      sb.from('email_messages').select('id,account_id,thread_id,category,from_name,from_address,subject,summary,snippet,received_at,web_link').eq('user_id', uid).gte('received_at', since24).order('received_at', { ascending: false }).limit(500),
       sb.from('email_digests').select('summary,digest_date,source,author,do_first').order('digest_date', { ascending: false }).limit(1),
       sb.from('daily_checkins').select('plan').eq('user_id', uid).eq('day', todayIso).maybeSingle(),
       sb.from('payhip_stores').select('id,name,company,created_at').order('created_at'),
@@ -199,7 +240,7 @@
   }
 
   // The chat writes email chips as [[email:<id>|Dana · Document review]]; show just the label.
-  function plainSummary(t) { return String(t || '').replace(/[[email:[^|]]*|([^]]*)]]/g, '$1'); }
+  function plainSummary(t) { return String(t || '').replace(/\[\[email:[^|\]]*\|([^\]]*)\]\]/g, '$1'); }
   function chatName() { return (S.digest && S.digest.author) || 'ChatGPT'; }
   function needsInView() { return S.needs.filter(function (m) { return inView(mailCo(m.account_id)); }); }
   function tasksInView() { return S.tasks.filter(function (t) { return inView(areaCo(t.life_area_id)); }); }
@@ -459,6 +500,13 @@
               '<div class="acts2"><a href="' + esc(gmailLink(m)) + '" target="_blank" rel="noopener">Reply in Gmail ↗</a><button type="button" data-archive="' + esc(m.id) + '">Done · archive</button></div></div>';
           }).join('') : '<div class="msg"><p style="color:var(--muted)">' + (S.chatList ? 'Nothing left to do first here.' : 'Nothing needs a reply here.') + '</p></div>') + '</div></div>';
       }).join('');
+      // The "new" count on the Numbers row is mail from the last 24 hours, so list it here too, or that number points at nothing.
+      var fresh = S.recent.filter(function (m) { return inView(mailCo(m.account_id)); });
+      if (S.accounts.length) body += '<div><p class="mlabel">New in the last 24 hours · ' + fresh.length + '</p><div class="mlist">' +
+        (fresh.length ? fresh.slice(0, 30).map(function (m) {
+          return '<div class="msg"><div class="l1"><b>' + esc(m.from_name || m.from_address || '') + '</b><span>' + esc(m.subject || '(no subject)') + '</span><small>' + new Date(m.received_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '</small></div>' +
+            '<p>' + esc(m.summary || m.snippet || '') + '</p><div class="acts2"><a href="' + esc(gmailLink(m)) + '" target="_blank" rel="noopener">Open in Gmail ↗</a></div></div>';
+        }).join('') : '<div class="msg"><p style="color:var(--muted)">No new mail in the last 24 hours.</p></div>') + '</div></div>';
       return { t: 'ChatGPT’s summary', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
     },
     sales: function () {

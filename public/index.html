@@ -42,6 +42,7 @@
         <button type="button" data-co="mpc"><i style="background:#1E9E98"></i>MPC</button>
         <button type="button" data-co="hg" aria-label="Happy Girls"><i style="background:#F2607F"></i><span>Happy Girls</span></button>
       </div>
+      <button type="button" class="chip primary" id="sodBtn">☀ Start my day</button>
       <button type="button" class="chip" data-open-btn="settings" aria-label="Settings">⚙︎ Settings</button>
     </div>
   </header>
@@ -104,6 +105,15 @@
     </nav>
   </div>
 </div>
+
+<!-- START MY DAY: asked once a day; opens ChatGPT with the start-of-day prompt filled in -->
+<dialog class="modal sod" id="sod" aria-labelledby="sodTitle">
+  <div class="mb">
+    <h2 id="sodTitle">Would you like to start your day?</h2>
+    <p>ChatGPT opens in a new tab with your start-of-day prompt ready: today’s calendar, tasks and email. Send it to begin.</p>
+    <div class="row"><button type="button" class="chip" id="sodLater">Not now</button><button type="button" class="chip primary" id="sodGo">☀ Start my day</button></div>
+  </div>
+</dialog>
 
 <dialog class="modal" id="modal" aria-labelledby="mTitle">
   <div class="mh"><span class="ic" id="mIcon"></span><div><h2 id="mTitle"></h2><p id="mSub"></p></div><button class="x" type="button" id="mClose" aria-label="Close">✕</button></div>
