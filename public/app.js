@@ -512,37 +512,64 @@
     sitempc: function () { return { t: 'MPC website', sub: 'malindaperryconsulting.com', note: 'Live site', frame: CO.mpc.site }; },
     settings: function () {
       var co = function (val, attrs) { return '<select ' + attrs + '><option value="both"' + (val === 'both' ? ' selected' : '') + '>Both</option><option value="mpc"' + (val === 'mpc' ? ' selected' : '') + '>MPC</option><option value="hg"' + (val === 'hg' ? ' selected' : '') + '>Happy Girls</option></select>'; };
-      var body = '<div class="set"><p class="mlabel">Google accounts (Gmail + Calendar)</p><div class="mlist">' +
-        (S.accounts.filter(function (a) { return a.provider === 'gmail'; }).map(function (a) {
+      var empty = function (t) { return '<div class="srow empty1">' + t + '</div>'; };
+      var pill = function (ok, t) { return '<span class="spill ' + (ok ? 'ok' : 'warn') + '">' + t + '</span>'; };
+      var gmail = S.accounts.filter(function (a) { return a.provider === 'gmail'; });
+      var gWarn = gmail.some(function (a) { var ca = S.calAccounts.find(function (x) { return x.account_id === a.id; }); return a.status !== 'active' || (ca && ca.status === 'needs_calendar_access'); });
+      var chatUsed = S.digest && S.digest.source === 'chat' ? new Date(S.digest.digest_date + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+      // One section at a time, picked with the tabs, so the page stays short. A dot on a tab shows its state.
+      var TABS = [
+        ['google', 'Google', gmail.length ? (gWarn ? 'warn' : 'ok') : 'todo'],
+        ['calendars', 'Calendars', ''],
+        ['areas', 'Task areas', ''],
+        ['payhip', 'Payhip', S.stores.length ? 'ok' : 'todo'],
+        ['chatgpt', 'ChatGPT', chatUsed ? 'ok' : 'todo']
+      ];
+      var tab = S.setTab || 'google';
+      var sec = function (k, title, line, inner) { return '<section class="ssec" data-ssec="' + k + '"' + (k === tab ? '' : ' hidden') + '><div class="shead"><h3>' + title + '</h3><p>' + line + '</p></div>' + inner + '</section>'; };
+
+      var body = '<nav class="stabs" role="tablist" aria-label="Settings sections">' + TABS.map(function (t) {
+        return '<button type="button" role="tab" data-stab="' + t[0] + '" aria-selected="' + (t[0] === tab) + '">' + t[1] + (t[2] ? '<i class="dot ' + t[2] + '"></i>' : '') + '</button>';
+      }).join('') + '</nav>';
+
+      body += sec('google', 'Google accounts', 'Gmail and Google Calendar. Connected once, works on every device.',
+        '<div class="mlist">' + (gmail.map(function (a) {
           var ca = S.calAccounts.find(function (x) { return x.account_id === a.id; });
-          var warn = a.status !== 'active' ? '<span class="warn">Reconnect</span>' : ca && ca.status === 'needs_calendar_access' ? '<span class="warn">Reconnect for calendar</span>' : '';
-          return '<div class="srow"><span class="swatch" style="background:' + esc(a.color || '#E0602E') + '"></span><span class="grow">' + esc(a.email_address) + '<small>Connected once · works on every device</small></span>' + warn + co(mailCo(a.id), 'data-src="mailbox" data-ref="' + esc(a.id) + '" aria-label="Business for ' + esc(a.email_address) + '"') + '</div>';
-        }).join('') || '<div class="srow"><span class="grow" style="color:var(--muted)">No Google account yet</span></div>') +
-        '<div class="srow"><button type="button" class="btnl" data-connect="1">+ Connect a Google account</button><span class="grow"><small>Also use this to reconnect an account for its calendar.</small></span></div></div></div>';
-      // ChatGPT: the Momentum connector is added once to the ChatGPT account, so it works on every device signed in to
-      // ChatGPT. These steps add it, and test it, from any device.
-      var mcpUrl = C.api + '/api/mcp';
-      var chatUsed = S.digest && S.digest.source === 'chat' ? new Date(S.digest.digest_date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+          var st = a.status !== 'active' ? pill(false, 'Reconnect') : ca && ca.status === 'needs_calendar_access' ? pill(false, 'Reconnect for calendar') : pill(true, 'Connected');
+          return '<div class="srow"><span class="swatch" style="background:' + esc(a.color || '#E0602E') + '"></span><span class="grow"><b>' + esc(a.email_address) + '</b></span>' + st + co(mailCo(a.id), 'data-src="mailbox" data-ref="' + esc(a.id) + '" aria-label="Business for ' + esc(a.email_address) + '"') + '</div>';
+        }).join('') || empty('No Google account yet.')) + '</div>' +
+        '<div class="sacts"><button type="button" class="btnl primary" data-connect="1">+ Connect a Google account</button><span class="hint">Also reconnects an account that needs it.</span></div>');
+
+      body += sec('calendars', 'Calendars', 'Choose which calendars show on the cockpit, and which business each is for.',
+        '<div class="mlist">' + (S.cals.map(function (c) {
+          return '<div class="srow"><span class="swatch" style="background:' + esc(c.color) + '"></span><span class="grow"><b>' + esc(c.name) + '</b><small>' + esc(c.email) + (c.can_add ? '' : ' · view only') + '</small></span><label class="tog"><input type="checkbox" data-show="' + esc(c.key) + '"' + (c.shown ? ' checked' : '') + '><span>Show</span></label>' + co(calCo(c.account_id, c.id), 'data-src="calendar" data-ref="' + esc(c.key) + '" aria-label="Business for ' + esc(c.name) + '"') + '</div>';
+        }).join('') || empty('Calendars appear after you connect Google.')) + '</div>');
+
+      body += sec('areas', 'Task areas', 'Which business each area in Tasks belongs to.',
+        '<div class="mlist">' + (S.areas.map(function (a) {
+          return '<div class="srow"><span class="swatch" style="background:' + esc(a.color || '#1E9E98') + '"></span><span class="grow"><b>' + esc(a.name) + '</b></span>' + co(areaCo(a.id), 'data-src="area" data-ref="' + esc(a.id) + '" aria-label="Business for ' + esc(a.name) + '"') + '</div>';
+        }).join('') || empty('No areas in Tasks yet.')) + '</div>');
+
+      body += sec('payhip', 'Payhip', 'New sales arrive by themselves. For earlier sales, import Payhip’s sales export (CSV) once.',
+        '<div class="mlist" id="storeList">' + (S.stores.map(function (s) {
+          var n = S.sales.filter(function (x) { return x.store_id === s.id; }).length;
+          return '<div class="srow"><span class="grow"><b>' + esc(s.name) + '</b> ' + tag(s.company) + '<small>Added ' + new Date(s.created_at).toLocaleDateString() + ' · ' + n + ' sale' + (n === 1 ? '' : 's') + ' since last month</small></span>' + pill(true, 'Live') +
+            '<label class="btnl" style="cursor:pointer">Import past sales<input type="file" accept=".csv,text/csv" data-import="' + esc(s.id) + '" hidden></label><button type="button" class="btnl quiet" data-delstore="' + esc(s.id) + '">Remove</button></div>';
+        }).join('') || empty('No store yet.')) + '</div>' +
+        '<details class="sadd"' + (S.stores.length ? '' : ' open') + '><summary>+ Add a Payhip store</summary>' +
+        '<form class="addstore" id="addStore"><input id="stName" placeholder="Store name" required maxlength="80" aria-label="Store name">' + co('mpc', 'id="stCo" aria-label="Business"') + '<input id="stKey" placeholder="Payhip API key (optional)" aria-label="Payhip API key, optional" autocomplete="off"><button type="submit" class="btnl primary">Add store</button></form><div id="hookOut"></div></details>');
+
+      // ChatGPT: the Momentum connector is added once to the ChatGPT account, so it works on every device signed in to ChatGPT.
       var testPrompt = 'Use the Momentum connector: call get_today and tell me my first three tasks. If you can’t reach Momentum, tell me how to turn the connector on in this chat.';
-      body += '<div class="set"><p class="mlabel">ChatGPT (Momentum connector)</p><div class="mlist">' +
-        '<div class="srow"><span class="grow">' + (chatUsed ? 'Connected · last briefing ' + esc(chatUsed) : 'No ChatGPT briefing yet') + '<small>Add it once to your ChatGPT account and it works on every device where you’re signed in to ChatGPT. A new device only needs a ChatGPT sign-in.</small></span></div>' +
-        '<div class="srow"><span class="grow">1. Copy the connector address<div class="hookbox" style="margin-top:.35rem"><code id="mcpUrl">' + esc(mcpUrl) + '</code><button type="button" class="btnl" id="copyMcp">Copy</button></div></span></div>' +
-        '<div class="srow"><span class="grow">2. In ChatGPT, open Settings → Apps &amp; Connectors (or Connectors), add a custom connector named <b>Momentum</b> with that address, and sign in with this cockpit’s account.</span><a class="btnl" href="https://chatgpt.com/#settings/Connectors" target="_blank" rel="noopener">Open ChatGPT settings ↗</a></div>' +
-        '<div class="srow"><span class="grow">3. Check it works<small>Opens ChatGPT with a short test prompt. Turn on Momentum in that chat if it asks.</small></span><a class="btnl" href="https://chatgpt.com/?q=' + encodeURIComponent(testPrompt) + '" target="_blank" rel="noopener">Test in ChatGPT ↗</a></div>' +
-        '</div></div>';
-      body += '<div class="set"><p class="mlabel">Calendars</p><div class="mlist">' + (S.cals.map(function (c) {
-        return '<div class="srow"><span class="swatch" style="background:' + esc(c.color) + '"></span><span class="grow">' + esc(c.name) + '<small>' + esc(c.email) + (c.can_add ? '' : ' · view only') + '</small></span><label><input type="checkbox" data-show="' + esc(c.key) + '"' + (c.shown ? ' checked' : '') + '> Show</label>' + co(calCo(c.account_id, c.id), 'data-src="calendar" data-ref="' + esc(c.key) + '" aria-label="Business for ' + esc(c.name) + '"') + '</div>';
-      }).join('') || '<div class="srow"><span class="grow" style="color:var(--muted)">Calendars appear after you connect Google</span></div>') + '</div></div>';
-      body += '<div class="set"><p class="mlabel">Task areas</p><div class="mlist">' + (S.areas.map(function (a) {
-        return '<div class="srow"><span class="swatch" style="background:' + esc(a.color || '#1E9E98') + '"></span><span class="grow">' + esc(a.name) + '</span>' + co(areaCo(a.id), 'data-src="area" data-ref="' + esc(a.id) + '" aria-label="Business for ' + esc(a.name) + '"') + '</div>';
-      }).join('') || '<div class="srow"><span class="grow" style="color:var(--muted)">No life areas in Tasks yet</span></div>') + '</div></div>';
-      body += '<div class="set"><p class="mlabel">Payhip stores</p><div class="mlist" id="storeList">' + (S.stores.map(function (s) {
-        return '<div class="srow"><span class="grow">' + esc(s.name) + '<small>Added ' + new Date(s.created_at).toLocaleDateString() + '</small></span>' + tag(s.company) + '<label class="btnl" style="cursor:pointer">Import past sales<input type="file" accept=".csv,text/csv" data-import="' + esc(s.id) + '" hidden></label><button type="button" class="btnl" data-delstore="' + esc(s.id) + '">Remove</button></div>' +
-          '<div class="srow"><span class="grow"><small>New sales arrive by themselves. For sales from before ' + new Date(s.created_at).toLocaleDateString() + ', download your sales export (CSV) from Payhip and import it here once. Sales already here aren’t counted twice.</small></span></div>';
-      }).join('') || '<div class="srow"><span class="grow" style="color:var(--muted)">No stores yet</span></div>') +
-        '<form class="addstore" id="addStore"><input id="stName" placeholder="Store name" required maxlength="80" aria-label="Store name">' + co('mpc', 'id="stCo" aria-label="Business"') + '<input id="stKey" placeholder="Payhip API key (optional)" aria-label="Payhip API key, optional" autocomplete="off"><button type="submit" class="btnl">Add store</button></form><div id="hookOut"></div></div></div>';
-      body += '<div class="srow" style="border:0;padding:0"><button type="button" class="btnl" id="signOut">Sign out of this device</button></div>';
-      return { t: 'Settings', sub: 'Connected accounts and which business each belongs to', note: 'Saved for every device', body: body };
+      body += sec('chatgpt', 'ChatGPT', (chatUsed ? pill(true, 'Connected') + ' Last briefing ' + esc(chatUsed) + '. ' : '') + 'Add the Momentum connector once to your ChatGPT account; it then works on every device.',
+        '<ol class="steps">' +
+        '<li><span class="grow"><b>Copy the connector address</b><code id="mcpUrl">' + esc(C.api + '/api/mcp') + '</code></span><button type="button" class="btnl" id="copyMcp">Copy</button></li>' +
+        '<li><span class="grow"><b>Add it in ChatGPT</b><small>Settings → Connectors → add a custom one named Momentum, then sign in with this cockpit’s account.</small></span><a class="btnl" href="https://chatgpt.com/#settings/Connectors" target="_blank" rel="noopener">Open ChatGPT ↗</a></li>' +
+        '<li><span class="grow"><b>Test it</b><small>Opens ChatGPT with a short test question.</small></span><a class="btnl" href="https://chatgpt.com/?q=' + encodeURIComponent(testPrompt) + '" target="_blank" rel="noopener">Test ↗</a></li>' +
+        '</ol>');
+
+      body += '<div class="sfoot"><button type="button" class="linkbtn" id="signOut">Sign out of this device</button></div>';
+      return { t: 'Settings', sub: 'Your connections, and which business each one belongs to', note: 'Saved for every device', body: body };
     }
   };
 
@@ -574,6 +601,13 @@
   modal.addEventListener('close', function () { $('#mBody').innerHTML = ''; });
 
   document.addEventListener('click', function (e) {
+    var stab = e.target.closest('[data-stab]');
+    if (stab) {
+      S.setTab = stab.dataset.stab;
+      document.querySelectorAll('[data-stab]').forEach(function (b) { b.setAttribute('aria-selected', String(b === stab)); });
+      document.querySelectorAll('[data-ssec]').forEach(function (x) { x.hidden = x.dataset.ssec !== S.setTab; });
+      return;
+    }
     if (e.target.closest('[data-connect]')) { connectGoogle(); return; }
     var btn = e.target.closest('[data-open-btn]');
     if (btn) { openView(btn.dataset.openBtn); return; }
