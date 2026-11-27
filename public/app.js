@@ -15,6 +15,22 @@
   var fmtTime = function (d) { return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: d.getMinutes() ? '2-digit' : undefined }); };
   var hours = function (d) { return d.getHours() + d.getMinutes() / 60; };
 
+  // One icon and one color for each kind of thing, used everywhere it appears: the dock, the section headers, the
+  // Numbers lines and the views. Change a kind here and every place follows.
+  var KINDS = {
+    calendar: { bg: 'linear-gradient(135deg,#5AB6F5,#2F7FD0)', solid: '#2F7FD0', svg: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>' },
+    email: { bg: 'linear-gradient(135deg,#FF9A52,#E0602E)', solid: '#E0602E', svg: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3.5 7l8.5 6 8.5-6"/>' },
+    tasks: { bg: 'linear-gradient(135deg,#3CC68A,#1E8E5A)', solid: '#22A06B', svg: '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/>' },
+    sales: { bg: 'linear-gradient(135deg,#8B6CF0,#5B3FC4)', solid: '#7A5CE6', svg: '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/>' },
+    numbers: { bg: 'linear-gradient(135deg,#F2C14E,#C98A12)', solid: '#C98A12', svg: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' },
+    links: { bg: 'linear-gradient(135deg,#3A5357,#10292C)', solid: '#10292C', svg: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>' },
+    sitempc: { bg: 'linear-gradient(135deg,#2BB5AE,#1E9E98)', solid: '#1E9E98', svg: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>' },
+    settings: { bg: 'linear-gradient(135deg,#7A8986,#53625F)', solid: '#53625F', svg: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>' },
+    sun: { bg: 'linear-gradient(135deg,#FF9A52,#F2607F)', solid: '#F2607F', svg: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>' }
+  };
+  var kSvg = function (k) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + KINDS[k].svg + '</svg>'; };
+  document.querySelectorAll('[data-ic]').forEach(function (el) { var k = KINDS[el.dataset.ic]; if (!k) return; el.style.background = k.bg; el.innerHTML = kSvg(el.dataset.ic); });
+
   var sb = window.supabase.createClient(C.supabaseUrl, C.supabaseAnonKey, {
     auth: { storage: window.cockpitSessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
   });
@@ -394,7 +410,7 @@
   var sender = function (m) { return m.from_name || m.from_address || '(unknown sender)'; };
   // One email as Gmail shows it: sender, subject, then the summary; the address and full date on hover.
   function mailHead(m) {
-    return '<div class="l1"><b class="from" title="' + esc(m.from_address || '') + '">' + esc(sender(m)) + '</b>' + (m.from_name && m.from_address ? '<small class="addr">&lt;' + esc(m.from_address) + '&gt;</small>' : '') + (S.view === 'all' ? tag(mailCo(m.account_id)) : '') +
+    return '<div class="l1"><b class="from" title="' + esc(m.from_address || '') + '">' + esc(sender(m)) + '</b>' + (acctOf(m) ? '<small class="to">to ' + esc(acctOf(m).email_address) + '</small>' : '') + (S.view === 'all' ? tag(mailCo(m.account_id)) : '') +
       '<time title="' + esc(new Date(m.received_at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })) + '">' + esc(gmTime(m.received_at)) + '</time></div>' +
       '<div class="subj">' + esc(m.subject || '(no subject)') + '</div>';
   }
@@ -406,8 +422,8 @@
       $('#asks').innerHTML = '<div class="empty"><b>No Gmail connected.</b>Connect your Google account once in Settings.<button type="button" class="btnl" data-open-btn="settings">Open Settings</button></div>';
       return;
     }
-    var max = (innerWidth < 760 ? 2 : 3) - (S.chatList && S.digest.summary ? 1 : 0);
-    $('#asks').innerHTML = '<p class="lead">' + (S.chatList ? (list.length ? '<span>' + list.length + '</span> to do first · ' + esc(chatName()) : 'All done from ' + esc(chatName()) + '’s list.') : (list.length ? '<span>' + list.length + '</span> need' + (list.length === 1 ? 's' : '') + ' a reply' : 'Nothing needs a reply.') + ' <small>· ChatGPT hasn’t sorted today’s email yet</small>') + '</p>' +
+    var max = (innerWidth < 760 ? 2 : 3) - (S.chatList && S.digest.summary ? 1 : 0) - (S.chatList ? 0 : 1);
+    $('#asks').innerHTML = '<p class="lead">' + (S.chatList ? (list.length ? '<span>' + list.length + '</span> to do first · ' + esc(chatName()) : 'All done from ' + esc(chatName()) + '’s list.') : (list.length ? '<span>' + list.length + '</span> need' + (list.length === 1 ? 's' : '') + ' a reply' : 'Nothing needs a reply.')) + '</p>' + (S.chatList ? '' : sodCta()) +
       (S.chatList && S.digest.summary ? '<div class="wait">' + esc(plainSummary(S.digest.summary).slice(0, 220)) + '</div>' : '') +
       list.slice(0, max).map(function (m) {
         var more = m.why || m.summary || m.snippet || '';
@@ -442,9 +458,9 @@
     var salesNote = !S.stores.length ? '<span>Add your Payhip stores in Settings</span>' :
       (salesCos().length > 1 && split(function (co) { return money(salesNumbers([co]).week); }) || '<span>' + money(sn.month) + ' this month' + (sn.pct !== null ? ' <span class="up">' + (sn.pct >= 0 ? '▲' : '▼') + Math.abs(sn.pct) + '%</span>' : '') + '</span>');
     $('#rows').innerHTML =
-      '<button class="nr" type="button" data-open-btn="tasks"><span class="ni" style="background:linear-gradient(135deg,#2BB5AE,#126E72)">' + SV + '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/></svg></span><span class="nm"><b>Tasks today</b>' + (split(tFor) || '<span>' + (tasks.length - done) + ' left' + (S.taskSource === 'due' ? ' · due today' : '') + '</span>') + '</span><span class="v num">' + done + '<small>of ' + tasks.length + '</small></span><span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:#1E9E98"></i></span><span class="chev">›</span></button>' +
-      '<button class="nr" type="button" data-open-btn="email"><span class="ni" style="background:linear-gradient(135deg,#FF9A52,#E0602E)">' + SV + '<path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 2h6l1-2h5"/></svg></span><span class="nm"><b>Emails</b>' + (split(eFor) || '<span>' + needs + (S.chatList ? ' to do first' : ' need a reply') + '</span>') + '</span><span class="v num">' + fresh + '<small>new</small></span><span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:#FF8A4C"></i></span><span class="chev">›</span></button>' +
-      '<button class="nr" type="button" data-open-btn="sales"><span class="ni" style="background:linear-gradient(135deg,#8B6CF0,#5B3FC4)">' + SV + '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg></span><span class="nm"><b>Sales' + (S.stores.length ? '<span class="payhip"><i></i>Payhip live</span>' : '') + '</b>' + salesNote + '</span><span class="v num">' + money(sn.today) + '<small class="under">' + money(sn.week) + ' last 7 days</small></span><svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="#8B6CF0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chev">›</span></button>';
+      '<button class="nr" type="button" data-open-btn="tasks"><span class="ni" style="background:' + KINDS.tasks.bg + '">' + kSvg('tasks') + '</span><span class="nm"><b>Tasks today</b>' + (split(tFor) || '<span>' + (tasks.length - done) + ' left' + (S.taskSource === 'due' ? ' · due today' : '') + '</span>') + '</span><span class="v num">' + done + '<small>of ' + tasks.length + '</small></span><span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:' + KINDS.tasks.solid + '"></i></span><span class="chev">›</span></button>' +
+      '<button class="nr" type="button" data-open-btn="email"><span class="ni" style="background:' + KINDS.email.bg + '">' + kSvg('email') + '</span><span class="nm"><b>Emails</b>' + (split(eFor) || '<span>' + needs + (S.chatList ? ' to do first' : ' need a reply') + '</span>') + '</span><span class="v num">' + fresh + '<small>new</small></span><span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:' + KINDS.email.solid + '"></i></span><span class="chev">›</span></button>' +
+      '<button class="nr" type="button" data-open-btn="sales"><span class="ni" style="background:' + KINDS.sales.bg + '">' + kSvg('sales') + '</span><span class="nm"><b>Sales' + (S.stores.length ? '<span class="payhip"><i></i>Payhip live</span>' : '') + '</b>' + salesNote + '</span><span class="v num">' + money(sn.today) + '<small class="under">' + money(sn.week) + ' last 7 days</small></span><svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="' + KINDS.sales.solid + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chev">›</span></button>';
   }
 
   /* ---------------- company switch ---------------- */
@@ -909,15 +925,7 @@
     sitempc: { name: 'the MPC website', web: CO.mpc.site },
     settings: null
   };
-  var ICONS = {
-    calendar: ['linear-gradient(135deg,#5AB6F5,#2F7FD0)', '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
-    email: ['linear-gradient(135deg,#FF9A52,#E0602E)', '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3.5 7l8.5 6 8.5-6"/>'],
-    sales: ['linear-gradient(135deg,#8B6CF0,#5B3FC4)', '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/>'],
-    tasks: ['linear-gradient(135deg,#2BB5AE,#126E72)', '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/>'],
-    links: ['#10292C', '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'],
-    sitempc: ['#1E9E98', '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>'],
-    settings: ['#53625F', '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>']
-  };
+  var ICONS = {}; Object.keys(KINDS).forEach(function (k) { ICONS[k] = [KINDS[k].bg, KINDS[k].svg]; });
   var who = function () { return S.view === 'all' ? 'Both businesses' : CO[S.view].name; };
   // Gmail opens the message in the inbox it came to (authuser = that address). If that Google account isn't signed in
   // on this browser, Gmail falls back to whichever account is, so each email also says which inbox it is in and offers
@@ -928,14 +936,20 @@
     if (m.web_link && (!a || m.web_link.indexOf('authuser=') > 0)) return m.web_link;
     return 'https://mail.google.com/mail/u/?authuser=' + encodeURIComponent(a ? a.email_address : '') + '#all/' + encodeURIComponent(m.thread_id || '');
   };
-  var gmailSignIn = function (m) {
-    var a = acctOf(m);
-    return 'https://accounts.google.com/AddSession?Email=' + encodeURIComponent(a ? a.email_address : '') + '&continue=' + encodeURIComponent(gmailLink(m));
-  };
   function gmailActs(m, label, extra) {
-    var a = acctOf(m);
-    return '<div class="acts2"><a class="gmgo" href="' + esc(gmailLink(m)) + '" target="_blank" rel="noopener">' + label + ' ↗</a>' + (extra || '') + '</div>' +
-      (a ? '<p class="inbox">In <b>' + esc(a.email_address) + '</b>. Opened the wrong Gmail? <a href="' + esc(gmailSignIn(m)) + '" target="_blank" rel="noopener">Sign in as ' + esc(a.email_address) + '</a></p>' : '');
+    return '<div class="macts"><a class="mact" href="' + esc(gmailLink(m)) + '" target="_blank" rel="noopener">' + label + ' ↗</a>' + (extra || '') + '</div>';
+  }
+  // Once per view: if Gmail opens a different signed-in account, sign in to the right inbox and land in it.
+  function gmailHelp(accts) {
+    if (!accts.length) return '';
+    return '<p class="gmhelp">Gmail opening the wrong account? Sign in as ' + accts.map(function (a) {
+      var inbox = 'https://mail.google.com/mail/u/?authuser=' + encodeURIComponent(a.email_address);
+      return '<a href="' + esc('https://accounts.google.com/AddSession?Email=' + encodeURIComponent(a.email_address) + '&continue=' + encodeURIComponent(inbox)) + '" target="_blank" rel="noopener">' + esc(a.email_address) + '</a>';
+    }).join(' or ') + '.</p>';
+  }
+  // Shown wherever ChatGPT's summary would be, until ChatGPT has summarized today.
+  function sodCta() {
+    return '<button type="button" class="sodcta" data-sod="1"><span class="sodi" style="background:' + KINDS.sun.bg + '">' + kSvg('sun') + '</span><span class="sodt"><b>Start my day</b><small>ChatGPT hasn’t summarized today yet. Have it look at your tasks and emails.</small></span><span class="sodgo" aria-hidden="true">›</span></button>';
   }
 
   // The last four weeks of sales as bars, one a day, today on the right.
@@ -950,7 +964,7 @@
   var VIEWS = {
     email: function () {
       var groups = S.accounts.filter(function (a) { return inView(mailCo(a.id)); });
-      var body = S.digest ? '<p class="mtext">' + esc(plainSummary(S.digest.summary)) + '</p>' : '';
+      var body = (S.chatList ? '' : sodCta()) + (S.digest ? '<p class="mtext">' + esc(plainSummary(S.digest.summary)) + '</p>' : '');
       body += groups.map(function (a) {
         var list = S.needs.filter(function (m) { return m.account_id === a.id; });
         return '<div><p class="mlabel">' + esc(a.email_address) + ' ' + tag(mailCo(a.id)) + ' · ' + list.length + (S.chatList ? ' to do first' : ' need a reply') + '</p><div class="mlist">' +
@@ -958,7 +972,7 @@
             var steps = Array.isArray(m.thread_next_steps) ? m.thread_next_steps.slice(0, 2).join(' · ') : '';
             return '<div class="msg" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span>' + mailHead(m) +
               (m.why ? '<p><b>Why first:</b> ' + esc(m.why) + '</p>' : '') + '<p>' + esc(m.summary || m.snippet || '') + '</p>' + (steps ? '<p><b>Next:</b> ' + esc(steps) + '</p>' : '') +
-              gmailActs(m, 'Reply in Gmail', '<button type="button" data-archive="' + esc(m.id) + '">Done · archive</button>') + '</div>';
+              gmailActs(m, 'Reply in Gmail', '<button type="button" class="mact" data-archive="' + esc(m.id) + '">Archive</button>') + '</div>';
           }).join('') : '<div class="msg"><p style="color:var(--muted)">' + (S.chatList ? 'Nothing left to do first here.' : 'Nothing needs a reply here.') + '</p></div>') + '</div></div>';
       }).join('');
       // The "new" count on the Numbers row is mail from the last 24 hours, so list it here too, or that number points at nothing.
@@ -968,6 +982,7 @@
           return '<div class="msg"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span>' + mailHead(m) +
             '<p>' + esc(m.summary || m.snippet || '') + '</p>' + gmailActs(m, 'Open in Gmail') + '</div>';
         }).join('') : '<div class="msg"><p style="color:var(--muted)">No new mail in the last 24 hours.</p></div>') + '</div></div>';
+      body += gmailHelp(groups);
       return { t: 'ChatGPT’s summary', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
     },
     sales: function () {
@@ -1097,6 +1112,7 @@
       document.querySelectorAll('[data-ssec]').forEach(function (x) { x.hidden = x.dataset.ssec !== S.setTab; });
       return;
     }
+    if (e.target.closest('[data-sod]')) { startDay(); return; }
     if (e.target.closest('[data-connect]')) { connectGoogle(); return; }
     var btn = e.target.closest('[data-open-btn]');
     if (btn && btn.dataset.openBtn === 'links') { openLinks(); return; }

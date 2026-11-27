@@ -312,3 +312,32 @@ input.evfield::placeholder{color:#6B7774}
 .msg .inbox{margin:.35rem 0 0;font-size:.74rem;color:var(--muted)}
 .msg .inbox b{color:var(--ink);font-weight:700}
 .msg .inbox a{color:#1A73E8;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+
+/* Email view, simplified: one quiet row of actions per email, the inbox in the header, sign-in help once at the end */
+.msg .l1 .to{color:var(--muted);font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 2 auto;min-width:0}
+.macts{display:flex;gap:.25rem;margin:.35rem 0 0 -.55rem;flex-wrap:wrap}
+.mact{display:inline-flex;align-items:center;height:1.9rem;padding:0 .6rem;border:0;border-radius:999px;background:none;font:700 .78rem var(--font);color:#1A73E8;cursor:pointer;transition:background .15s}
+.mact:hover{background:rgba(26,115,232,.08)}
+button.mact{color:var(--muted)}
+button.mact:hover{background:rgba(16,41,44,.06);color:var(--ink)}
+.gmhelp{margin:0;padding:.2rem .2rem 0;font-size:.76rem;color:var(--muted);text-align:center}
+.gmhelp a{color:#1A73E8;font-weight:700}
+.gmhelp a:hover{text-decoration:underline}
+@media (max-width:760px){.msg .l1 .to{display:none}}
+
+/* Start my day card, where ChatGPT's summary goes until ChatGPT has summarized today */
+.sodcta{display:flex;align-items:center;gap:.7rem;width:100%;padding:.55rem .7rem .55rem .55rem;border:1px solid rgba(242,96,127,.25);border-radius:.9rem;background:linear-gradient(135deg,#FFF4EC,#FDEFF3);text-align:left;cursor:pointer;transition:box-shadow .2s,transform .2s}
+.sodcta:hover{box-shadow:0 10px 22px -14px rgba(242,96,127,.7);transform:translateY(-1px)}
+.sodi{width:2.1rem;height:2.1rem;flex:0 0 auto;border-radius:.65rem;display:grid;place-items:center;color:#fff;box-shadow:inset 0 -2px 0 rgba(0,0,0,.12)}
+.sodi svg{width:58%;height:58%}
+.sodt{flex:1;min-width:0}
+.sodt b{display:block;font-size:.9rem;font-weight:800}
+.sodt small{display:block;font-size:.74rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sodgo{font-size:1.3rem;font-weight:700;color:#C2386A}
+.mb > .sodcta{padding:.8rem 1rem .8rem .8rem}
+.mb > .sodcta .sodi{width:2.6rem;height:2.6rem}
+.mb > .sodcta small{white-space:normal}
+
+/* Dock icons are drawn icons now (one per kind, shared with the rest of the cockpit) */
+.dock a i svg,.dock button i svg{width:55%;height:55%}
+.zh .ic,.nr .ni{box-shadow:inset 0 -2px 0 rgba(0,0,0,.12)}

@@ -51,7 +51,7 @@
     <!-- CALENDAR -->
     <section class="zone calzone" aria-label="Calendar" data-open="calendar">
       <div class="zh">
-        <span class="ic" style="background:linear-gradient(135deg,#5AB6F5,#2F7FD0)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+        <span class="ic" data-ic="calendar"></span>
         <h2>Calendar</h2>
         <span class="sync">⇄ Google Calendar</span>
         <span class="st" id="calNext"></span>
@@ -68,7 +68,7 @@
       <!-- EMAIL -->
       <section class="zone" aria-label="ChatGPT’s summary" data-open="email">
         <div class="zh">
-          <span class="ic" style="background:linear-gradient(135deg,#FF9A52,#E0602E)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3.5 7l8.5 6 8.5-6"/></svg></span>
+          <span class="ic" data-ic="email"></span>
           <h2>ChatGPT’s summary</h2><span class="gmail">Gmail</span><span class="st" id="mailSt"></span>
           <div class="acts"><button class="chip expand" type="button" data-open-btn="email">⤢ Expand</button></div>
         </div>
@@ -78,7 +78,7 @@
       <!-- NUMBERS -->
       <section class="zone numzone" aria-label="Your numbers">
         <div class="zh">
-          <span class="ic" style="background:linear-gradient(135deg,#2BB5AE,#126E72)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+          <span class="ic" data-ic="numbers"></span>
           <h2>Numbers</h2><span class="st">Tap a line for details</span>
         </div>
         <div class="rows" id="rows"></div>
@@ -88,14 +88,14 @@
 
   <div class="dockwrap">
     <nav class="dock" aria-label="Apps">
-      <button type="button" data-open-btn="tasks"><i style="background:linear-gradient(135deg,#F2607F,#C2386A)">✓</i><span>Tasks</span></button>
-      <button type="button" data-open-btn="email"><i style="background:linear-gradient(135deg,#FF9A52,#E0602E)">@</i><span>Gmail</span></button>
-      <button type="button" data-open-btn="calendar"><i style="background:linear-gradient(135deg,#5AB6F5,#2F7FD0)">31</i><span>Calendar</span></button>
-      <button type="button" data-open-btn="sales"><i style="background:linear-gradient(135deg,#2BB5AE,#126E72)">$</i><span>Sales</span></button>
-      <button type="button" data-open-btn="links"><i style="background:#10292C">∞</i><span>Links</span></button>
+      <button type="button" data-open-btn="tasks"><i data-ic="tasks"></i><span>Tasks</span></button>
+      <button type="button" data-open-btn="email"><i data-ic="email"></i><span>Gmail</span></button>
+      <button type="button" data-open-btn="calendar"><i data-ic="calendar"></i><span>Calendar</span></button>
+      <button type="button" data-open-btn="sales"><i data-ic="sales"></i><span>Sales</span></button>
+      <button type="button" data-open-btn="links"><i data-ic="links"></i><span>Links</span></button>
       <span class="sep"></span>
-      <button type="button" data-open-btn="sitempc"><i style="background:#1E9E98">MP</i><span>Website</span></button>
-      <button type="button" data-open-btn="settings"><i style="background:#53625F">⚙︎</i><span>Settings</span></button>
+      <button type="button" data-open-btn="sitempc"><i data-ic="sitempc"></i><span>Website</span></button>
+      <button type="button" data-open-btn="settings"><i data-ic="settings"></i><span>Settings</span></button>
     </nav>
   </div>
 </div>
