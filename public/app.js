@@ -424,12 +424,14 @@
     // The count stays above the list, and See all opens the full Inbox view.
     $('#asks').innerHTML = (S.chatList ? '' : sodCta()) +
       (S.chatList && S.digest.summary ? '<p class="isum">' + esc(plainSummary(S.digest.summary)) + '</p>' : '') +
-      '<p class="glab">' + (S.chatList ? 'To do first · ' + list.length + '<span> from ' + esc(chatName()) + '</span>' : 'Needs a reply · ' + list.length) + '</p>' +
+      (list.length ? '<p class="glab">' + (S.chatList ? 'To do first · ' + list.length + '<span> from ' + esc(chatName()) + '</span>' : 'Needs a reply · ' + list.length) + '</p>' : '') +
       (list.length ? '<div class="ibl" id="ibl">' + list.map(function (m) {
         var more = m.why || m.summary || m.snippet || '';
         return '<div class="ask gm" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><span class="tx"><span class="r1"><b class="from" title="' + esc(m.from_address || '') + '">' + esc(sender(m)) + '</b>' + (S.view === 'all' ? tag(mailCo(m.account_id)) : '') + '<time>' + esc(gmTime(m.received_at)) + '</time></span><span class="r2"><b>' + esc(m.subject || '(no subject)') + '</b>' + (more ? '<span> – ' + esc(more) + '</span>' : '') + '</span></span><button class="open2" type="button" data-open-btn="email">Open</button></div>';
-      }).join('') + '</div>' : '<div class="inone">' + (S.chatList ? 'All done from ' + esc(chatName()) + '’s list.' : 'Nothing needs a reply right now.') + '</div>') +
-      '<button type="button" class="seeall" data-open-btn="email">' + (list.length ? 'See all ' + list.length + ' in Inbox' : 'Open Inbox') + ' <span aria-hidden="true">›</span></button>';
+      }).join('') + '</div>' :
+      // Nothing to list. Before Start my day the card says it all; after it, one calm line.
+      (S.chatList ? '<div class="inone"><span class="inok" aria-hidden="true">✓</span>All caught up on ' + esc(chatName()) + '’s list.</div>' : '<div class="inone"></div>')) +
+      (list.length ? '<button type="button" class="seeall" data-open-btn="email">See all ' + list.length + ' in Inbox <span aria-hidden="true">›</span></button>' : '');
     fadeList();
   }
   // A soft fade at the list's bottom edge while there is more to scroll to.
@@ -478,7 +480,7 @@
     $('#rows').innerHTML =
       line('tasks', 'Tasks', tSub, done + '<small> of ' + tasks.length + '</small>', 'done today', '<span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:' + KINDS.tasks.solid + '"></i></span>') +
       line('email', 'Email', eSub, String(fresh), 'new today', '<span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:' + KINDS.email.solid + '"></i></span>') +
-      line('sales', 'Sales' + (S.stores.length ? '<span class="payhip"><i></i>Payhip live</span>' : ''), sSub, money(sn.today), 'today', '<svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="' + KINDS.sales.solid + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+      line('sales', 'Sales', sSub, money(sn.today), 'today', '<svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="' + KINDS.sales.solid + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
   }
 
 
@@ -985,8 +987,11 @@
       var groups = S.accounts.filter(function (a) { return inView(mailCo(a.id)); });
       // Exactly one of the two: today's summary from ChatGPT once it exists, the Start my day card until then.
       var body = S.chatList ? (S.digest.summary ? '<p class="mtext">' + esc(plainSummary(S.digest.summary)) + '</p>' : '') : sodCta();
+      var anyNeeds = false;
       body += groups.map(function (a) {
         var list = S.needs.filter(function (m) { return m.account_id === a.id; });
+        if (!list.length) return '';
+        anyNeeds = true;
         return '<div><p class="mlabel">' + esc(a.email_address) + ' ' + tag(mailCo(a.id)) + ' · ' + list.length + (S.chatList ? ' to do first' : ' need a reply') + '</p><div class="mlist">' +
           (list.length ? list.map(function (m) {
             var steps = Array.isArray(m.thread_next_steps) ? m.thread_next_steps.slice(0, 2).join(' · ') : '';
@@ -995,9 +1000,10 @@
               gmailActs(m, 'Reply in Gmail', '<button type="button" class="mact" data-archive="' + esc(m.id) + '">Archive</button>') + '</div>';
           }).join('') : '<div class="msg"><p style="color:var(--muted)">' + (S.chatList ? 'Nothing left to do first here.' : 'Nothing needs a reply here.') + '</p></div>') + '</div></div>';
       }).join('');
+      if (!anyNeeds && S.accounts.length) body += '<div class="mquiet"><span class="inok" aria-hidden="true">✓</span>' + (S.chatList ? 'All caught up on ' + esc(chatName()) + '’s list.' : 'Nothing needs a reply right now.') + '</div>';
       // The "new" count on the Numbers row is mail from the last 24 hours, so list it here too, or that number points at nothing.
       var fresh = S.recent.filter(function (m) { return inView(mailCo(m.account_id)); });
-      if (S.accounts.length) body += '<div><p class="mlabel">New in the last 24 hours · ' + fresh.length + '</p><div class="mlist">' +
+      if (fresh.length) body += '<div><p class="mlabel">New in the last 24 hours · ' + fresh.length + '</p><div class="mlist">' +
         (fresh.length ? fresh.slice(0, 30).map(function (m) {
           return '<div class="msg"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span>' + mailHead(m) +
             '<p>' + esc(m.summary || m.snippet || '') + '</p>' + gmailActs(m, 'Open in Gmail') + '</div>';

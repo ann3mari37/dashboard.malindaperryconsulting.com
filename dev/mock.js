@@ -63,7 +63,8 @@
     cockpit_sources: [],
     email_accounts: [{ id: A1, email_address: 'malinda@malindaperryconsulting.com', color: '#1E9E98', status: 'active', provider: 'gmail' }, { id: A2, email_address: 'hello@happygirlsdontdothat.com', color: '#F2607F', status: 'active', provider: 'gmail' }],
     life_areas: [],
-    email_messages: [
+    // localStorage mock.empty = 1: no email needs a reply and nothing new came in.
+    email_messages: (function () { try { return localStorage.getItem('mock.empty') === '1'; } catch (e) { return false; } })() ? [] : [
       { id: 'm1', account_id: A1, thread_id: 't1', from_name: 'Dana Rivera', from_address: 'dana@example.com', subject: 'Document review for Thursday', summary: 'Dana sent the revised contract and wants your notes before Thursday’s call.', received_at: new Date(now - 36e5).toISOString(), category: 'action_needed', importance: 3, thread_next_steps: ['Read the contract', 'Reply with notes'] },
       { id: 'm2', account_id: A2, thread_id: 't2', from_name: 'Jordan Lee', from_address: 'jordan@example.com', subject: 'Podcast guest slot', summary: 'Jordan offers two recording dates next week and needs one picked.', received_at: new Date(now - 72e5).toISOString(), category: 'action_needed', importance: 2 },
       { id: 'm4', account_id: A1, thread_id: 'tm4', from_name: 'Avery Stone', from_address: 'avery@example.com', subject: 'Podcast edit notes', summary: 'Avery sent timestamps for the cuts and needs a yes on the new intro.', received_at: new Date(now - 3e6 * 3.6).toISOString(), category: 'action_needed', importance: 2 },
