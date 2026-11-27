@@ -426,4 +426,4 @@ a.btnl,label.btnl{display:inline-flex;align-items:center;text-decoration:none;co
 .inone{gap:.4rem;grid-auto-flow:column;align-content:center;justify-content:center}
 .inok{display:inline-grid;place-items:center;width:1.4rem;height:1.4rem;border-radius:50%;background:#E3F4EA;color:#1E8E5A;font-size:.75rem;font-weight:800}
 /* Sales: the last-7-days amount is highlighted when there were sales */
-.nr .nm .wk7{display:inline;padding:.05rem .45rem;border-radius:999px;background:#ECE5FD;color:#4A2FB0;font-weight:800}
+.nr .nm .wk7{display:inline;padding:.05rem .35rem;border-radius:.25rem;background:#ECE5FD;color:#4A2FB0;font-weight:800}
