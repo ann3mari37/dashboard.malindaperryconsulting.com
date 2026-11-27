@@ -301,9 +301,11 @@
     var list = S.sales.filter(function (s) { var co = storeCo(s.store_id); return cos.indexOf(co) >= 0 || co === 'both'; });
     var sum = function (from, to) { return list.filter(function (s) { var t = new Date(s.sold_at); return t >= from && t < to; }).reduce(function (a, s) { return a + Number(s.amount); }, 0); };
     var cnt = list.filter(function (s) { return new Date(s.sold_at) >= d0; }).length;
+    // A rolling 7 days: exactly 7 x 24 hours back from this moment, not since a day or week began.
+    var w0 = new Date(now.getTime() - 7 * 864e5), wList = list.filter(function (s) { return new Date(s.sold_at) >= w0; });
     var spark = []; for (var i = 13; i >= 0; i--) { var a = addDays(d0, -i); spark.push(sum(a, addDays(a, 1))); }
     var month = sum(m0, addDays(d0, 1)), prev = sum(p0, pEnd);
-    return { today: sum(d0, addDays(d0, 1)), n: cnt, month: month, prev: prev, pct: prev ? Math.round((month - prev) / prev * 100) : null, spark: spark };
+    return { today: sum(d0, addDays(d0, 1)), n: cnt, week: wList.reduce(function (a, s) { return a + Number(s.amount); }, 0), wn: wList.length, month: month, prev: prev, pct: prev ? Math.round((month - prev) / prev * 100) : null, spark: spark };
   }
   function renderRows() {
     var SV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
@@ -316,11 +318,11 @@
     var max = Math.max.apply(null, sn.spark.concat([1]));
     var path = sn.spark.map(function (v, i) { return (i ? 'L' : 'M') + (i * 100 / 13).toFixed(1) + ' ' + (22 - v / max * 20).toFixed(1); }).join(' ');
     var salesNote = !S.stores.length ? '<span>Add your Payhip stores in Settings</span>' :
-      (split(function (co) { return money(salesNumbers([co]).today); }) || '<span>' + money(sn.month) + ' this month' + (sn.pct !== null ? ' <span class="up">' + (sn.pct >= 0 ? '▲' : '▼') + Math.abs(sn.pct) + '%</span>' : '') + '</span>');
+      (split(function (co) { return money(salesNumbers([co]).week); }) || '<span>' + money(sn.month) + ' this month' + (sn.pct !== null ? ' <span class="up">' + (sn.pct >= 0 ? '▲' : '▼') + Math.abs(sn.pct) + '%</span>' : '') + '</span>');
     $('#rows').innerHTML =
       '<button class="nr" type="button" data-open-btn="tasks"><span class="ni" style="background:linear-gradient(135deg,#2BB5AE,#126E72)">' + SV + '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/></svg></span><span class="nm"><b>Tasks today</b>' + (split(tFor) || '<span>' + (tasks.length - done) + ' left' + (S.taskSource === 'due' ? ' · due today' : '') + '</span>') + '</span><span class="v num">' + done + '<small>of ' + tasks.length + '</small></span><span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:#1E9E98"></i></span><span class="chev">›</span></button>' +
       '<button class="nr" type="button" data-open-btn="email"><span class="ni" style="background:linear-gradient(135deg,#FF9A52,#E0602E)">' + SV + '<path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 2h6l1-2h5"/></svg></span><span class="nm"><b>Emails</b>' + (split(eFor) || '<span>' + needs + ' need a reply</span>') + '</span><span class="v num">' + fresh + '<small>new</small></span><span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:#FF8A4C"></i></span><span class="chev">›</span></button>' +
-      '<button class="nr" type="button" data-open-btn="sales"><span class="ni" style="background:linear-gradient(135deg,#8B6CF0,#5B3FC4)">' + SV + '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg></span><span class="nm"><b>Sales' + (S.stores.length ? '<span class="payhip"><i></i>Payhip live</span>' : '') + '</b>' + salesNote + '</span><span class="v num">' + money(sn.today) + '<small>today</small></span><svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="#8B6CF0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chev">›</span></button>';
+      '<button class="nr" type="button" data-open-btn="sales"><span class="ni" style="background:linear-gradient(135deg,#8B6CF0,#5B3FC4)">' + SV + '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg></span><span class="nm"><b>Sales' + (S.stores.length ? '<span class="payhip"><i></i>Payhip live</span>' : '') + '</b>' + salesNote + '</span><span class="v num">' + money(sn.week) + '<small>last 7 days</small></span><svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="#8B6CF0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chev">›</span></button>';
   }
 
   /* ---------------- company switch ---------------- */
@@ -436,7 +438,7 @@
       return { t: 'Gmail', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
     },
     sales: function () {
-      var body = '<div class="mstats">' + cosInView().map(function (co) { var n = salesNumbers([co]); return '<div class="mstat"><span>' + esc(CO[co].short) + ' today</span><b class="num">' + money(n.today) + '</b><span>' + n.n + ' sale' + (n.n === 1 ? '' : 's') + '</span></div><div class="mstat"><span>' + esc(CO[co].short) + ' this month</span><b class="num">' + money(n.month) + '</b><span>' + (n.pct === null ? 'first month' : (n.pct >= 0 ? '▲' : '▼') + Math.abs(n.pct) + '% vs last month') + '</span></div>'; }).join('') + '</div>';
+      var body = '<div class="mstats">' + cosInView().map(function (co) { var n = salesNumbers([co]); return '<div class="mstat"><span>' + esc(CO[co].short) + ' last 7 days</span><b class="num">' + money(n.week) + '</b><span>' + n.wn + ' sale' + (n.wn === 1 ? '' : 's') + '</span></div><div class="mstat"><span>' + esc(CO[co].short) + ' this month</span><b class="num">' + money(n.month) + '</b><span>' + (n.pct === null ? 'first month' : (n.pct >= 0 ? '▲' : '▼') + Math.abs(n.pct) + '% vs last month') + '</span></div>'; }).join('') + '</div>';
       var m0 = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       var prod = {};
       salesInView().filter(function (s) { return new Date(s.sold_at) >= m0; }).forEach(function (s) { var k = (s.items && s.items.length ? s.items.join(', ') : 'Sale') + '|' + storeCo(s.store_id); prod[k] = prod[k] || { n: 0, amt: 0 }; prod[k].n++; prod[k].amt += Number(s.amount); });
