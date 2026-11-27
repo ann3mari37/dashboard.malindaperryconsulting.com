@@ -281,6 +281,19 @@
       (needs.length ? '<button type="button" class="addcal" data-open-btn="settings" data-tab="google"><span class="warn">Reconnect ' + needs.length + ' for calendar</span></button>' : '') +
       '<button type="button" class="addcal" data-open-btn="settings" data-tab="google">+ Add account</button>';
   }
+  // The calendar list collapses with the Calendars button; the choice is kept on this device. On a phone there's no
+  // room for it, so the button opens Settings on the Calendars tab instead.
+  var SIDE_KEY = 'cockpit.calSide';
+  function setCalSide(open) {
+    $('.calzone').classList.toggle('side-closed', !open);
+    $('#calSideBtn').setAttribute('aria-expanded', String(open));
+    try { localStorage.setItem(SIDE_KEY, open ? '1' : '0'); } catch (e) { /* not kept */ }
+  }
+  (function () { var v = null; try { v = localStorage.getItem(SIDE_KEY); } catch (e) { /* default */ } setCalSide(v !== '0'); })();
+  $('#calSideBtn').addEventListener('click', function () {
+    if (innerWidth <= 760) { S.setTab = 'calendars'; openView('settings'); return; }
+    setCalSide($('.calzone').classList.contains('side-closed'));
+  });
   $('#legend').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-cal]'); if (!b) return;
     var c = S.cals.find(function (x) { return x.key === b.dataset.cal; }); if (!c) return;
