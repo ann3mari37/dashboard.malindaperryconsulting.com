@@ -58,11 +58,12 @@
     handleReturn();
     renderStatic();
     await loadAll();
-    setInterval(loadData, 5 * 60 * 1000);
+    syncMail();
+    setInterval(function () { syncMail().then(loadData); }, 5 * 60 * 1000);
     setInterval(loadCalendar, 15 * 60 * 1000);
     var last = Date.now();
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible' && Date.now() - last > 2 * 60 * 1000) { last = Date.now(); loadData(); }
+      if (document.visibilityState === 'visible' && Date.now() - last > 2 * 60 * 1000) { last = Date.now(); loadData(); syncMail(); }
     });
     subscribeSales();
   }
@@ -85,6 +86,12 @@
 
   /* ---------------- loading ---------------- */
   async function loadAll() { await Promise.all([loadData(), loadCalendar()]); }
+  // The page only reads mail already in the database, so ask the Worker to fetch new mail from Gmail first
+  // (it skips an inbox fetched in the last 2 minutes), then show what arrived.
+  async function syncMail() {
+    try { var r = await api('/api/email/sync', {}); if (r.accounts && r.accounts.some(function (a) { return a.fetched; })) await loadData(); }
+    catch (e) { console.warn('mail sync failed', e && e.message); }
+  }
 
   async function loadData() {
     var uid = S.user.id, today = startOfDay(new Date()), todayIso = isoDay(today);
