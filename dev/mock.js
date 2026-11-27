@@ -54,6 +54,10 @@
       console.log('[mock] created', body);
       out = { id: id, link: null };
     } else if (path === '/api/email/sync') out = { accounts: [] };
+    else if (path === '/api/account/email') {
+      if (body.password !== 'test-pass') return Promise.resolve(new Response(JSON.stringify({ error: 'wrong_password' }), { status: 403 }));
+      session.user.email = body.email; out = { email: body.email, changed: true };
+    }
     return new Promise(function (r) { setTimeout(function () { r(new Response(JSON.stringify(out), { status: 200, headers: { 'Content-Type': 'application/json' } })); }, 250); });
   };
 
@@ -94,7 +98,7 @@
   }
   var session = { access_token: 'mock', user: { id: '9f1c2e7a-0000-4000-8000-0000000000aa', email: 'hello@malindaperryconsulting.com' } };
   window.supabase = { createClient: function () { return {
-    auth: { getSession: function () { return Promise.resolve({ data: { session: session } }); }, onAuthStateChange: function () {}, signOut: function () { return Promise.resolve(); }, updateUser: function (attrs) { console.log('[mock] updateUser', Object.keys(attrs)); if (attrs.email) session.user.new_email = attrs.email; return Promise.resolve({ data: { user: session.user }, error: null }); }, signInWithPassword: function () { return Promise.resolve({}); } },
+    auth: { getSession: function () { return Promise.resolve({ data: { session: session } }); }, onAuthStateChange: function () {}, signOut: function () { return Promise.resolve(); }, refreshSession: function () { return Promise.resolve({ data: { user: session.user, session: session } }); }, updateUser: function (attrs) { console.log('[mock] updateUser', Object.keys(attrs)); if (attrs.email) session.user.new_email = attrs.email; return Promise.resolve({ data: { user: session.user }, error: null }); }, signInWithPassword: function () { return Promise.resolve({}); } },
     from: q,
     channel: function () { var c = { on: function () { return c; }, subscribe: function () { return c; } }; return c; }
   }; } };

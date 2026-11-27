@@ -1090,10 +1090,11 @@
       // One account signs in to the cockpit, Tasks (here and in its phone app) and opens Links, so a change here is a change everywhere.
       var u = S.user || {};
       body += sec('account', 'Your account', 'One sign-in for the cockpit, Tasks (on the web and on your phone) and Links. Change it here and it changes everywhere.',
-        '<div class="mlist"><div class="srow"><span class="grow"><b>Sign-in email</b><small>' + esc(u.email || '') + '</small></span>' + (u.new_email ? pill(false, 'Confirm ' + esc(u.new_email)) : pill(true, 'In use')) + '</div></div>' +
+        '<div class="mlist"><div class="srow"><span class="grow"><b>Sign-in email</b><small>' + esc(u.email || '') + '</small></span>' + pill(true, 'In use') + '</div></div>' +
         '<form class="acct" id="acctEmail" novalidate><b>Change your email</b>' +
           '<label for="acEmail">New email</label><input id="acEmail" type="email" autocomplete="email" required>' +
-          '<div class="sacts"><button class="btnl primary" type="submit">Send confirmation</button><span class="hint">Your connected Gmail inboxes stay as they are. The new email works after you click the link we send to it.</span></div></form>' +
+          '<label for="acEmailPw">Your current password</label><input id="acEmailPw" type="password" autocomplete="current-password" required>' +
+          '<div class="sacts"><button class="btnl primary" type="submit">Change email</button><span class="hint">Changes right away, no confirmation email. Sign in with the new email from now on. Your connected Gmail inboxes stay as they are.</span></div></form>' +
         '<form class="acct" id="acctPass" novalidate><b>Change your password</b>' +
           '<label for="acPass1">New password</label><input id="acPass1" type="password" autocomplete="new-password" minlength="8" required>' +
           '<label for="acPass2">Type it again</label><input id="acPass2" type="password" autocomplete="new-password" required>' +
@@ -1207,11 +1208,22 @@
       var to = $('#acEmail').value.trim();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { toast('Type the new email address.'); return done(); }
       if (S.user && to.toLowerCase() === String(S.user.email || '').toLowerCase()) { toast('That’s already your email.'); return done(); }
-      var r = await sb.auth.updateUser({ email: to }, { emailRedirectTo: location.origin + '/' });
+      var pw = $('#acEmailPw').value;
+      if (!pw) { toast('Type your current password.'); return done(); }
+      // The Tasks app changes it right away (no confirmation email) once the current password checks out.
+      try { await api('/api/account/email', { email: to, password: pw }); }
+      catch (err) {
+        done();
+        var m = err.message;
+        toast(m === 'wrong_password' ? 'That password isn’t right.' : m === 'email_taken' ? 'Another account already uses that email.' : m === 'owner_id_not_set' ? 'One setup step first: your account ID needs adding to the Tasks app, or Links would stop signing you in.' : 'Couldn’t change it (' + m + '). Try again.');
+        return;
+      }
       done();
-      if (r.error) { toast('Couldn’t change it: ' + r.error.message); return; }
-      if (r.data && r.data.user) S.user = r.data.user;
-      toast('Check ' + to + ' for a confirmation link. Your email changes when you click it.');
+      // Pick up the new email in this device's sign-in.
+      var ref = await sb.auth.refreshSession().catch(function () { return {}; });
+      var nu = ref && ref.data && ref.data.user;
+      S.user = nu || Object.assign({}, S.user, { email: to });
+      toast('Done. Sign in with ' + to + ' from now on.');
       openView('settings');
       return;
     }
