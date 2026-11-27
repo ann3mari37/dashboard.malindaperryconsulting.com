@@ -92,9 +92,9 @@
     };
     return b;
   }
-  var session = { access_token: 'mock', user: { id: 'u1', email: 'preview@example.com' } };
+  var session = { access_token: 'mock', user: { id: '9f1c2e7a-0000-4000-8000-0000000000aa', email: 'hello@malindaperryconsulting.com' } };
   window.supabase = { createClient: function () { return {
-    auth: { getSession: function () { return Promise.resolve({ data: { session: session } }); }, onAuthStateChange: function () {}, signOut: function () { return Promise.resolve(); }, signInWithPassword: function () { return Promise.resolve({}); } },
+    auth: { getSession: function () { return Promise.resolve({ data: { session: session } }); }, onAuthStateChange: function () {}, signOut: function () { return Promise.resolve(); }, updateUser: function (attrs) { console.log('[mock] updateUser', Object.keys(attrs)); if (attrs.email) session.user.new_email = attrs.email; return Promise.resolve({ data: { user: session.user }, error: null }); }, signInWithPassword: function () { return Promise.resolve({}); } },
     from: q,
     channel: function () { var c = { on: function () { return c; }, subscribe: function () { return c; } }; return c; }
   }; } };

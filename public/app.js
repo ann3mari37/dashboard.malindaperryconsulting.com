@@ -481,7 +481,7 @@
       // Highlighted when there were sales in the last 7 days
       (sn.week > 0 ? '<span class="wk7">' + money(sn.week) + ' in the last 7 days</span>' : money(sn.week) + ' in the last 7 days') + (salesCos().length > 1 ? ' (' + salesCos().map(function (co) { return esc(CO[co].short) + ' ' + money(salesNumbers([co]).week); }).join(' · ') + ')' : ''); // the month-over-month change is in the Sales view; it didn't fit here
     $('#rows').innerHTML =
-      line('tasks', 'Tasks', tSub, done + '<small> of ' + tasks.length + '</small>', 'done today', '<span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:' + KINDS.tasks.solid + '"></i></span>') +
+      line('tasks', 'Tasks', tasks.length ? tSub : 'Nothing due or planned yet', tasks.length ? done + '<small> of ' + tasks.length + '</small>' : '0', tasks.length ? 'done today' : 'tasks today', '<span class="bar"><i style="width:' + (tasks.length ? Math.round(done / tasks.length * 100) : 0) + '%;background:' + KINDS.tasks.solid + '"></i></span>') +
       line('email', 'Email', eSub, String(fresh), 'new today', '<span class="bar"><i style="width:' + (fresh ? Math.max(6, Math.round(needs / fresh * 100)) : 0) + '%;background:' + KINDS.email.solid + '"></i></span>') +
       line('sales', 'Sales', sSub, money(sn.today), 'today', '<svg class="mini" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="none" stroke="' + KINDS.sales.solid + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
   }
@@ -1041,7 +1041,8 @@
         ['calendars', 'Calendars', ''],
         ['areas', 'Task areas', ''],
         ['payhip', 'Payhip', S.stores.length ? 'ok' : 'todo'],
-        ['chatgpt', 'ChatGPT', chatUsed ? 'ok' : 'todo']
+        ['chatgpt', 'ChatGPT', chatUsed ? 'ok' : 'todo'],
+        ['account', 'Account', '']
       ];
       var tab = S.setTab || 'google';
       var sec = function (k, title, line, inner) { return '<section class="ssec" data-ssec="' + k + '"' + (k === tab ? '' : ' hidden') + '><div class="shead"><h3>' + title + '</h3><p>' + line + '</p></div>' + inner + '</section>'; };
@@ -1086,6 +1087,18 @@
         '<li><span class="grow"><b>Test it</b><small>Opens ChatGPT with a short test question.</small></span><a class="btnl" href="https://chatgpt.com/?q=' + encodeURIComponent(testPrompt) + '" target="_blank" rel="noopener">Test ↗</a></li>' +
         '</ol>');
 
+      // One account signs in to the cockpit, Tasks (here and in its phone app) and opens Links, so a change here is a change everywhere.
+      var u = S.user || {};
+      body += sec('account', 'Your account', 'One sign-in for the cockpit, Tasks (on the web and on your phone) and Links. Change it here and it changes everywhere.',
+        '<div class="mlist"><div class="srow"><span class="grow"><b>Sign-in email</b><small>' + esc(u.email || '') + '</small></span>' + (u.new_email ? pill(false, 'Confirm ' + esc(u.new_email)) : pill(true, 'In use')) + '</div></div>' +
+        '<form class="acct" id="acctEmail" novalidate><b>Change your email</b>' +
+          '<label for="acEmail">New email</label><input id="acEmail" type="email" autocomplete="email" required>' +
+          '<div class="sacts"><button class="btnl primary" type="submit">Send confirmation</button><span class="hint">Your connected Gmail inboxes stay as they are. The new email works after you click the link we send to it.</span></div></form>' +
+        '<form class="acct" id="acctPass" novalidate><b>Change your password</b>' +
+          '<label for="acPass1">New password</label><input id="acPass1" type="password" autocomplete="new-password" minlength="8" required>' +
+          '<label for="acPass2">Type it again</label><input id="acPass2" type="password" autocomplete="new-password" required>' +
+          '<div class="sacts"><button class="btnl primary" type="submit">Change password</button><span class="hint">At least 8 characters. You stay signed in here; other devices ask for the new one next time.</span></div></form>' +
+        '<p class="hint acctid">Account ID (for setup): <code>' + esc(u.id || '') + '</code></p>');
       body += '<div class="sfoot"><button type="button" class="linkbtn" id="signOut">Sign out of this device</button></div>';
       return { t: 'Settings', sub: 'Your connections, and which business each one belongs to', note: 'Saved for every device', body: body };
     }
@@ -1182,6 +1195,38 @@
       c.shown = chk.checked;
       saveSource('calendar', c.key, { shown: c.shown, company: calCo(c.account_id, c.id) }).then(loadCalendar);
     }
+  });
+  // Settings → Account: the sign-in email (confirmed by a link sent to the new address) and the password.
+  modal.addEventListener('submit', async function (e) {
+    if (e.target.id !== 'acctEmail' && e.target.id !== 'acctPass') return;
+    e.preventDefault();
+    var btn = e.target.querySelector('button[type=submit]'), label = btn.textContent;
+    var done = function () { btn.disabled = false; btn.textContent = label; };
+    btn.disabled = true; btn.textContent = 'Saving…';
+    if (e.target.id === 'acctEmail') {
+      var to = $('#acEmail').value.trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { toast('Type the new email address.'); return done(); }
+      if (S.user && to.toLowerCase() === String(S.user.email || '').toLowerCase()) { toast('That’s already your email.'); return done(); }
+      var r = await sb.auth.updateUser({ email: to }, { emailRedirectTo: location.origin + '/' });
+      done();
+      if (r.error) { toast('Couldn’t change it: ' + r.error.message); return; }
+      if (r.data && r.data.user) S.user = r.data.user;
+      toast('Check ' + to + ' for a confirmation link. Your email changes when you click it.');
+      openView('settings');
+      return;
+    }
+    var p1 = $('#acPass1').value, p2 = $('#acPass2').value;
+    if (p1.length < 8) { toast('Use at least 8 characters.'); return done(); }
+    if (p1 !== p2) { toast('The two passwords don’t match.'); return done(); }
+    var r2 = await sb.auth.updateUser({ password: p1 });
+    done();
+    if (r2.error) {
+      var c = r2.error.code || '';
+      toast(c === 'same_password' ? 'That’s already your password.' : c === 'weak_password' ? 'Pick a stronger password: ' + r2.error.message : c === 'reauthentication_needed' ? 'For safety, sign out, sign back in, then change it.' : 'Couldn’t change it: ' + r2.error.message);
+      return;
+    }
+    $('#acPass1').value = ''; $('#acPass2').value = '';
+    toast('Password changed. Use it next time you sign in on another device.');
   });
   modal.addEventListener('submit', async function (e) {
     if (e.target.id !== 'addStore') return;

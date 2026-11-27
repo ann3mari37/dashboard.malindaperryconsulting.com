@@ -427,3 +427,14 @@ a.btnl,label.btnl{display:inline-flex;align-items:center;text-decoration:none;co
 .inok{display:inline-grid;place-items:center;width:1.4rem;height:1.4rem;border-radius:50%;background:#E3F4EA;color:#1E8E5A;font-size:.75rem;font-weight:800}
 /* Sales: the last-7-days amount is highlighted when there were sales */
 .nr .nm .wk7{display:inline;padding:.05rem .35rem;border-radius:.25rem;background:#ECE5FD;color:#4A2FB0;font-weight:800}
+/* Phones: the business switch keeps every name (Happy Girls was only a pink dot) */
+@media (max-width:760px){
+  .co button span,.co button.all span{display:inline}
+  .co button{padding:0 .55rem;font-size:.74rem;gap:.35rem}
+  .top .right{flex-wrap:wrap;justify-content:flex-end;row-gap:.45rem}
+}
+/* Phones: Today at a glance figures read on one line ("2 of 4 done today"), not stacked */
+@media (max-width:760px){
+  .nr .v{display:flex;align-items:baseline;gap:.3rem;font-size:1.25rem}
+  .nr .v small.under{display:inline;margin:0;font-size:.72rem}
+}
