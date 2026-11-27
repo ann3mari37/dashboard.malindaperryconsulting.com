@@ -109,8 +109,10 @@
       '',
       'Please:',
       '1. Email: call get_inbox, read the threads that matter with read_email_thread, then save_email_briefing with a short summary and a ranked do_first list.',
-      '2. Tasks: call get_today and get_overview. Tell me what is due or overdue, and suggest 3 to 5 things for today that fit around my calendar. Keep my pinned first thing first.',
-      '3. Give me one short plan for the day: which emails to answer first, my tasks in order, and when to do them between meetings, for MaLinda Perry Consulting and Happy Girls Don\'t Do That.',
+      '2. Tasks: call get_today and get_overview. Tell me what is due or overdue, and what I planned for yesterday but didn\'t finish, so it carries over.',
+      '3. Yesterday: look back at what we talked about yesterday (our chats and anything you remember) and pull out anything that should become a to-do or shape today: promises I made, follow-ups, ideas I said I\'d act on, things I was waiting on.',
+      '4. Suggest 3 to 5 things for today that fit around my calendar, counting the carry-overs and anything from yesterday\'s conversations. Keep my pinned first thing first.',
+      '5. Give me one short plan for the day: which emails to answer first, my tasks in order, and when to do them between meetings, for MaLinda Perry Consulting and Happy Girls Don\'t Do That.',
       'Ask me before adding, completing or changing anything.'
     ].join('\n');
   }
@@ -229,17 +231,33 @@
       var shown = S.cals.filter(function (c) { return c.shown; }).slice(0, 20);
       var from = calStart(), to = addDays(from, 7);
       var ev = shown.length ? await api('/api/calendar/events', { from: from.toISOString(), to: to.toISOString(), calendars: shown.map(function (c) { return { account_id: c.account_id, calendar_id: c.id }; }) }) : { events: [] };
-      S.events = (ev.events || []).map(function (e) {
-        var s = e.all_day ? new Date(e.start + 'T00:00:00') : new Date(e.start);
-        var en = e.all_day ? new Date(e.end + 'T00:00:00') : new Date(e.end);
-        return Object.assign({}, e, { s: s, e: en, key: calKey(e.account_id, e.calendar_id) });
-      });
+      S.events = mapEvents(ev.events);
       S.calError = null;
     } catch (e) {
       S.calError = e.message;
     }
     S.calLoaded = true;
     renderLegend(); renderCal();
+    if (cxd && cxd.open) { renderCXSide(); renderCXMain(); }
+  }
+  function mapEvents(list) {
+    return (list || []).map(function (e) {
+      var s = e.all_day ? new Date(e.start + 'T00:00:00') : new Date(e.start);
+      var en = e.all_day ? new Date(e.end + 'T00:00:00') : new Date(e.end);
+      return Object.assign({}, e, { s: s, e: en, key: calKey(e.account_id, e.calendar_id) });
+    });
+  }
+  // Events for any range (the expanded calendar moves around freely). Kept per range and calendar set until an
+  // event is added, so going back and forth is instant.
+  var RANGE = {};
+  function fetchRange(from, to) {
+    var shown = S.cals.filter(function (c) { return c.shown; }).slice(0, 20);
+    var key = from.getTime() + '|' + to.getTime() + '|' + shown.map(function (c) { return c.key; }).join(',');
+    if (RANGE[key]) return RANGE[key];
+    var p = shown.length ? api('/api/calendar/events', { from: from.toISOString(), to: to.toISOString(), calendars: shown.map(function (c) { return { account_id: c.account_id, calendar_id: c.id }; }) }).then(function (r) { return mapEvents(r.events); }) : Promise.resolve([]);
+    RANGE[key] = p;
+    p.catch(function () { delete RANGE[key]; });
+    return p;
   }
 
   /* ---------------- render ---------------- */
@@ -267,6 +285,9 @@
     if (!S.calLoaded) { el.innerHTML = '<span class="gsrc">Loading calendars…</span>'; return; }
     // A side list like Google Calendar's: calendars grouped under their Google address (sorted), each with a box
     // to show or hide it. The account's own calendar comes first and is called "Main calendar".
+    el.innerHTML = calListHtml();
+  }
+  function calListHtml() {
     var cals = S.cals.filter(function (c) { return inView(calCo(c.account_id, c.id)); });
     var needs = S.calAccounts.filter(function (a) { return a.status === 'needs_calendar_access'; });
     var groups = {};
@@ -277,9 +298,16 @@
         return '<button type="button" data-cal="' + esc(c.key) + '" aria-pressed="' + c.shown + '" title="' + (c.shown ? 'Hide ' : 'Show ') + esc(c.name) + '"><i style="border-color:' + esc(c.color) + ';background:' + esc(c.color) + '"></i><span>' + esc(c.primary ? 'Main calendar' : c.name) + '</span></button>';
       }).join('') + '</div>';
     }).join('');
-    el.innerHTML = (html || '<p class="caddr">No calendars yet</p>') +
+    return (html || '<p class="caddr">No calendars yet</p>') +
       (needs.length ? '<button type="button" class="addcal" data-open-btn="settings" data-tab="google"><span class="warn">Reconnect ' + needs.length + ' for calendar</span></button>' : '') +
       '<button type="button" class="addcal" data-open-btn="settings" data-tab="google">+ Add account</button>';
+  }
+  function toggleCal(key) {
+    var c = S.cals.find(function (x) { return x.key === key; }); if (!c) return;
+    c.shown = !c.shown;
+    saveSource('calendar', c.key, { shown: c.shown, company: calCo(c.account_id, c.id) }).then(function () { if (c.shown) { loadCalendar(); if (cxd.open) loadCX(); } });
+    renderLegend(); renderCal();
+    if (cxd.open) { renderCXSide(); renderCXMain(); }
   }
   // The calendar list is a side menu with its own ☰ button, like a classic menu; when collapsed only that button
   // stays. The choice is kept on this device. On a phone there's no room for it: a Calendars button opens Settings.
@@ -292,11 +320,7 @@
   (function () { var v = null; try { v = localStorage.getItem(SIDE_KEY); } catch (e) { /* default */ } setCalSide(v !== '0'); })();
   $('#calMenuBtn').addEventListener('click', function () { setCalSide($('.calzone').classList.contains('side-closed')); });
   $('#legend').addEventListener('click', function (e) {
-    var b = e.target.closest('button[data-cal]'); if (!b) return;
-    var c = S.cals.find(function (x) { return x.key === b.dataset.cal; }); if (!c) return;
-    c.shown = !c.shown;
-    saveSource('calendar', c.key, { shown: c.shown, company: calCo(c.account_id, c.id) }).then(function () { if (c.shown) loadCalendar(); });
-    renderLegend(); renderCal();
+    var b = e.target.closest('button[data-cal]'); if (b) toggleCal(b.dataset.cal);
   });
 
   function renderCal() {
@@ -415,42 +439,434 @@
     renderAll();
   });
 
-  /* ---------------- quick add ---------------- */
-  var pop = $('#addPop'), add = { cal: null, day: 0, s: 15, len: 1 };
-  function pickers() {
-    var cals = S.cals.filter(function (c) { return c.can_add && inView(calCo(c.account_id, c.id)); });
-    if (!cals.find(function (c) { return c.key === add.cal; })) add.cal = cals[0] ? cals[0].key : null;
-    $('#pickCal').innerHTML = cals.length ? cals.map(function (c) { return '<button type="button" data-pc="' + esc(c.key) + '" aria-pressed="' + (add.cal === c.key) + '"><span style="display:inline-block;width:.55rem;height:.55rem;border-radius:2px;background:' + esc(c.color) + ';margin-right:.3rem"></span>' + esc(c.name) + '</button>'; }).join('') : '<span class="note">Connect Google in Settings first.</span>';
-    var days = []; for (var i = 0; i < 7; i++) days.push(addDays(calStart(), i));
-    $('#pickDay').innerHTML = days.map(function (d, i) { return '<button type="button" data-day="' + i + '" aria-pressed="' + (add.day === i) + '">' + (i === 0 ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })) + '</button>'; }).join('');
-    $('#pickTime').innerHTML = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(function (t) { var d = new Date(); d.setHours(t, 0, 0, 0); return '<button type="button" data-t="' + t + '" aria-pressed="' + (add.s === t) + '">' + fmtTime(d) + '</button>'; }).join('');
-    $('#pickLen').innerHTML = [[0.5, '30 min'], [1, '1 hour'], [1.5, '90 min'], [2, '2 hours']].map(function (v) { return '<button type="button" data-len="' + v[0] + '" aria-pressed="' + (add.len === v[0]) + '">' + v[1] + '</button>'; }).join('');
+  /* ---------------- calendar helpers ---------------- */
+  var SV2 = function (p, w) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (w || 2) + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>'; };
+  var IC = {
+    left: '<path d="M15 18l-6-6 6-6"/>', right: '<path d="M9 18l6-6-6-6"/>', x: '<path d="M18 6L6 18M6 6l12 12"/>',
+    pin: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    cal: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    ext: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
+    check: '<path d="M5 12l5 5L20 7"/>', warn: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2 18a2 2 0 0 0 1.7 3h16.6A2 2 0 0 0 22 18L13.7 3.9a2 2 0 0 0-3.4 0z"/>'
+  };
+  var sameDay = function (a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); };
+  var parseIso = function (s) { var p = String(s).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); };
+  // Google Calendar's way of writing times: 9am, 1:30pm.
+  var fmtMin = function (m) { var h = Math.floor(m / 60) % 24, mm = m % 60; return ((h + 11) % 12 + 1) + (mm ? ':' + pad(mm) : '') + (h < 12 ? 'am' : 'pm'); };
+  var minOf = function (d) { return d.getHours() * 60 + d.getMinutes(); };
+  var durLabel = function (m) { if (m < 60) return m + ' mins'; var h = m / 60; return (h % 1 ? h.toFixed(2).replace(/0$/, '') : h) + (h === 1 ? ' hr' : ' hrs'); };
+  var tzLong = function () { try { return new Intl.DateTimeFormat(undefined, { timeZoneName: 'long' }).formatToParts(new Date()).find(function (p) { return p.type === 'timeZoneName'; }).value; } catch (e) { return Intl.DateTimeFormat().resolvedOptions().timeZone; } };
+  var tzShort = function () { try { return new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' }).formatToParts(new Date()).find(function (p) { return p.type === 'timeZoneName'; }).value; } catch (e) { return ''; } };
+  var calsInView = function (list) { return list.filter(function (e) { var c = S.cals.find(function (x) { return x.key === e.key; }); return c && c.shown && inView(calCo(e.account_id, e.calendar_id)); }); };
+  var writableCals = function () { return S.cals.filter(function (c) { return c.can_add && inView(calCo(c.account_id, c.id)); }).sort(function (a, b) { return (b.primary ? 1 : 0) - (a.primary ? 1 : 0) || a.email.localeCompare(b.email) || a.name.localeCompare(b.name); }); };
+  var calLabel = function (c) { return c.primary ? 'Main calendar' : c.name; };
+  function whenText(ev) {
+    var dl = function (d) { return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }); };
+    if (ev.all_day) { var last = addDays(ev.e, -1); return sameDay(ev.s, last) || last < ev.s ? dl(ev.s) : ev.s.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' – ' + last.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+    if (!sameDay(ev.s, ev.e) && ev.e - ev.s > 864e5 / 2) return ev.s.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ' + fmtMin(minOf(ev.s)) + ' – ' + ev.e.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ' + fmtMin(minOf(ev.e));
+    return dl(ev.s) + ' · ' + fmtMin(minOf(ev.s)) + ' – ' + fmtMin(minOf(ev.e));
   }
-  function openAdd(open) { pop.hidden = !open; $('#addBtn').setAttribute('aria-expanded', String(open)); if (open) { pickers(); setTimeout(function () { $('#addWhat').focus(); }, 30); } }
-  $('#addBtn').addEventListener('click', function () { openAdd(pop.hidden); });
-  $('#addCancel').addEventListener('click', function () { openAdd(false); });
-  pop.addEventListener('keydown', function (e) { if (e.key === 'Escape') openAdd(false); });
-  pop.addEventListener('click', function (e) {
-    var b = e.target.closest('.pick button'); if (!b) return;
-    if (b.dataset.pc) add.cal = b.dataset.pc;
-    if (b.dataset.day) add.day = +b.dataset.day;
-    if (b.dataset.t) add.s = +b.dataset.t;
-    if (b.dataset.len) add.len = +b.dataset.len;
-    pickers();
+
+  // A small month like the one in Google Calendar's side bar. Used by the expanded calendar and the date picker.
+  function miniMonth(month, selected, range) {
+    var first = new Date(month.getFullYear(), month.getMonth(), 1), start = addDays(first, -first.getDay()), today = startOfDay(new Date());
+    var h = '<div class="mm"><div class="mmh"><b>' + esc(first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })) + '</b>' +
+      '<button type="button" class="mmnav" data-mm="-1" aria-label="Previous month">' + SV2(IC.left, 2.4) + '</button><button type="button" class="mmnav" data-mm="1" aria-label="Next month">' + SV2(IC.right, 2.4) + '</button></div><div class="mmg">';
+    for (var w = 0; w < 7; w++) h += '<span class="mmw">' + esc(addDays(start, w).toLocaleDateString(undefined, { weekday: 'narrow' })) + '</span>';
+    for (var i = 0; i < 42; i++) {
+      var d = addDays(start, i), cls = [];
+      if (d.getMonth() !== first.getMonth()) cls.push('out');
+      if (sameDay(d, today)) cls.push('today');
+      if (selected && sameDay(d, selected)) cls.push('sel');
+      if (range && d >= range[0] && d < range[1]) cls.push('rng');
+      h += '<button type="button" data-mmd="' + isoDay(d) + '" class="' + cls.join(' ') + '" aria-label="' + esc(d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })) + '"' + (cls.indexOf('sel') >= 0 ? ' aria-current="date"' : '') + '>' + d.getDate() + '</button>';
+    }
+    return h + '</div></div>';
+  }
+
+  // Dialogs grow out of whatever opened them: the zone, the dock icon or the button.
+  var lastSrc = null;
+  document.addEventListener('pointerdown', function (e) { lastSrc = e.target.closest('.zone, .dock button, .nr, .ask, .tgc, .mc, button'); }, true);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') lastSrc = document.activeElement; }, true);
+  var calm = function () { return !document.body.animate || matchMedia('(prefers-reduced-motion: reduce)').matches; };
+  function growFrom(dlg, src) {
+    if (calm()) return;
+    var to = dlg.getBoundingClientRect(), el = src && src.isConnected && !dlg.contains(src) ? src : null;
+    if (el && to.width) {
+      var f = el.getBoundingClientRect();
+      var inside = f.left >= to.left - 2 && f.right <= to.right + 2 && f.top >= to.top - 2 && f.bottom <= to.bottom + 2;
+      if (inside) { // the source sits inside the dialog's area: open it out from the source's edges
+        var clip = 'inset(' + (f.top - to.top) + 'px ' + (to.right - f.right) + 'px ' + (to.bottom - f.bottom) + 'px ' + (f.left - to.left) + 'px round 1.4rem)';
+        dlg.animate([{ clipPath: clip, opacity: .6 }, { clipPath: 'inset(0 0 0 0 round 1.6rem)', opacity: 1 }], { duration: 460, easing: 'cubic-bezier(.2,.85,.2,1)' });
+        var kids = dlg.querySelectorAll('.cxh, .cxs, .cxm, .mh, .mb > *');
+        kids.forEach(function (k, i) { k.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 380, delay: 120 + Math.min(i, 8) * 35, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }); });
+        return;
+      }
+      var dx = (f.left + f.width / 2) - (to.left + to.width / 2), dy = (f.top + f.height / 2) - (to.top + to.height / 2);
+      dlg.animate([{ transform: 'translate(' + dx * .6 + 'px,' + dy * .6 + 'px) scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 380, easing: 'cubic-bezier(.2,.9,.25,1.1)' });
+      return;
+    }
+    dlg.animate([{ transform: 'translateY(14px) scale(.97)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 300, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  }
+  function shrinkClose(dlg, after) {
+    if (!dlg.open) return;
+    var done = function () { if (dlg.open) dlg.close(); if (after) after(); };
+    if (calm()) return done();
+    dlg.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.97) translateY(6px)' }], { duration: 170, easing: 'ease-in' }).finished.then(done, done);
+  }
+
+  /* ---------------- add an event (Gmail / Google Calendar quick create) ---------------- */
+  var evd = $('#evDlg'), EV = { date: null, s: 540, e: 600, cal: null, mini: null }, lastAddedId = null;
+  function openCreate(o) {
+    o = o || {};
+    var now = new Date(), d = startOfDay(o.date || now);
+    var s = o.start != null ? o.start : sameDay(d, now) ? Math.ceil((minOf(now) + 1) / 30) * 30 : 9 * 60;
+    if (s > 23 * 60 + 30) { d = addDays(d, 1); s = 9 * 60; }
+    EV.date = d; EV.s = s; EV.e = Math.min(s + (o.len || 60), 1439); EV.mini = d;
+    var cals = writableCals();
+    if (!cals.find(function (c) { return c.key === EV.cal; })) { var keep = null; try { keep = localStorage.getItem('cockpit.addCal'); } catch (e) { /* none */ } EV.cal = (cals.find(function (c) { return c.key === keep; }) || cals[0] || {}).key || null; }
+    $('#evTitle').value = o.title || ''; $('#evLoc').value = '';
+    $('#evMini').hidden = true; $('#evCalMenu').hidden = true;
+    $('#evSave').disabled = false; $('#evSave').textContent = 'Save';
+    renderEv();
+    if (!evd.open) { evd.showModal(); growFrom(evd, o.src || lastSrc); }
+    $('#addBtn').setAttribute('aria-expanded', 'true');
+    setTimeout(function () { $('#evTitle').focus(); }, 40);
+  }
+  function closeCreate() { shrinkClose(evd); }
+  evd.addEventListener('close', function () { $('#addBtn').setAttribute('aria-expanded', 'false'); drawGhost(); });
+  evd.addEventListener('cancel', function (e) {
+    // Esc closes an open menu first, then the dialog.
+    if (!$('#evMini').hidden || !$('#evCalMenu').hidden) { e.preventDefault(); $('#evMini').hidden = true; $('#evCalMenu').hidden = true; $('#evDateBtn').setAttribute('aria-expanded', 'false'); $('#evCalBtn').setAttribute('aria-expanded', 'false'); return; }
+    e.preventDefault(); closeCreate();
   });
-  pop.addEventListener('submit', async function (e) {
+  evd.addEventListener('click', function (e) { if (e.target === evd) closeCreate(); });
+  $('#evClose').addEventListener('click', closeCreate);
+
+  function renderEv() {
+    var d = EV.date, c = S.cals.find(function (x) { return x.key === EV.cal; });
+    evd.style.setProperty('--ac', c ? c.color : '#2F7FD0');
+    $('#evDateBtn').textContent = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    var so = '', eo = '';
+    for (var m = 0; m < 1440; m += 15) so += '<option value="' + m + '"' + (m === EV.s ? ' selected' : '') + '>' + fmtMin(m) + '</option>';
+    if (so.indexOf(' selected') < 0) so = '<option value="' + EV.s + '" selected>' + fmtMin(EV.s) + '</option>' + so;
+    for (var x = EV.s + 15; x <= 1439; x += 15) eo += '<option value="' + x + '"' + (x === EV.e ? ' selected' : '') + '>' + fmtMin(x) + '</option>';
+    if (EV.s + 15 <= 1439 && (1439 - EV.s) % 15) eo += '<option value="1439"' + (EV.e === 1439 ? ' selected' : '') + '>11:59pm</option>';
+    if (!eo) eo = '<option value="1439" selected>11:59pm</option>';
+    $('#evStart').innerHTML = so; $('#evEnd').innerHTML = eo;
+    $('#evTz').textContent = durLabel(EV.e - EV.s) + ' · ' + tzLong() + ' · Does not repeat';
+    $('#evCalBtn').innerHTML = c ? '<i class="evdot" style="background:' + esc(c.color) + '"></i><span class="evcn"><b>' + esc(calLabel(c)) + '</b><small>' + esc(c.email) + '</small></span><span class="evcaret" aria-hidden="true">▾</span>' : '<span class="evcn"><b>No calendar you can add to</b><small>Connect Google in Settings</small></span>';
+    var cals = writableCals();
+    $('#evCalMenu').innerHTML = cals.map(function (k) { return '<button type="button" role="option" data-evcal="' + esc(k.key) + '" aria-selected="' + (k.key === EV.cal) + '"><i class="evdot" style="background:' + esc(k.color) + '"></i><span class="evcn"><b>' + esc(calLabel(k)) + '</b><small>' + esc(k.email) + '</small></span>' + (k.key === EV.cal ? SV2(IC.check, 2.6) : '') + '</button>'; }).join('');
+    if (!$('#evMini').hidden) $('#evMini').innerHTML = miniMonth(EV.mini, EV.date);
+    renderBusy(); drawGhost();
+  }
+  // Like Google's "busy" hint: shows what the new event would overlap.
+  function renderBusy() {
+    var a = addDays(EV.date, 0), s = new Date(a.getTime() + EV.s * 6e4), en = new Date(a.getTime() + EV.e * 6e4), seen = {};
+    var hits = calsInView(S.events.concat(CX.events || [])).filter(function (e) { var k = e.key + e.id; if (seen[k]) return false; seen[k] = 1; return !e.all_day && e.s < en && e.e > s; }).sort(function (x, y) { return x.s - y.s; });
+    var b = $('#evBusy');
+    b.hidden = !hits.length;
+    if (hits.length) b.innerHTML = SV2(IC.warn, 2.2) + '<span>Overlaps ' + hits.slice(0, 2).map(function (e) { return '<b>' + esc(e.title) + '</b> (' + fmtMin(minOf(e.s)) + '–' + fmtMin(minOf(e.e)) + ')'; }).join(' and ') + (hits.length > 2 ? ' and ' + (hits.length - 2) + ' more' : '') + '</span>';
+  }
+  $('#evStart').addEventListener('change', function () { var dur = EV.e - EV.s; EV.s = +this.value; EV.e = Math.min(EV.s + dur, 1439); if (EV.e <= EV.s) EV.e = Math.min(EV.s + 15, 1439); renderEv(); });
+  $('#evEnd').addEventListener('change', function () { EV.e = +this.value; renderEv(); });
+  $('#evTitle').addEventListener('input', drawGhost);
+  $('#evDateBtn').addEventListener('click', function () {
+    var m = $('#evMini'), open = m.hidden; m.hidden = !open; this.setAttribute('aria-expanded', String(open)); $('#evCalMenu').hidden = true;
+    if (open) { EV.mini = EV.date; m.innerHTML = miniMonth(EV.mini, EV.date); }
+  });
+  $('#evMini').addEventListener('click', function (e) {
+    var nav = e.target.closest('[data-mm]'), day = e.target.closest('[data-mmd]');
+    if (nav) { EV.mini = new Date(EV.mini.getFullYear(), EV.mini.getMonth() + +nav.dataset.mm, 1); this.innerHTML = miniMonth(EV.mini, EV.date); return; }
+    if (day) { EV.date = parseIso(day.dataset.mmd); this.hidden = true; $('#evDateBtn').setAttribute('aria-expanded', 'false'); renderEv(); }
+  });
+  $('#evCalBtn').addEventListener('click', function () { var m = $('#evCalMenu'), open = m.hidden && writableCals().length > 0; m.hidden = !open; this.setAttribute('aria-expanded', String(open)); $('#evMini').hidden = true; });
+  $('#evCalMenu').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-evcal]'); if (!b) return;
+    EV.cal = b.dataset.evcal; try { localStorage.setItem('cockpit.addCal', EV.cal); } catch (err) { /* not kept */ }
+    this.hidden = true; $('#evCalBtn').setAttribute('aria-expanded', 'false'); renderEv();
+  });
+  evd.addEventListener('click', function (e) {
+    // a click anywhere else closes the date picker or calendar menu
+    if (!e.target.closest('#evMini, #evDateBtn')) { $('#evMini').hidden = true; $('#evDateBtn').setAttribute('aria-expanded', 'false'); }
+    if (!e.target.closest('#evCalMenu, #evCalBtn')) { $('#evCalMenu').hidden = true; $('#evCalBtn').setAttribute('aria-expanded', 'false'); }
+  });
+  var evStartDate = function () { return new Date(EV.date.getTime() + EV.s * 6e4); };
+  var evEndDate = function () { return new Date(EV.date.getTime() + EV.e * 6e4); };
+  // "More options" hands everything to Google Calendar's full editor (guests, description, repeat, Meet).
+  $('#evMore').addEventListener('click', function () {
+    var c = S.cals.find(function (x) { return x.key === EV.cal; });
+    var g = function (d) { return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + 'T' + pad(d.getHours()) + pad(d.getMinutes()) + '00'; };
+    var q = new URLSearchParams({ action: 'TEMPLATE', text: $('#evTitle').value.trim(), dates: g(evStartDate()) + '/' + g(evEndDate()), ctz: Intl.DateTimeFormat().resolvedOptions().timeZone });
+    if ($('#evLoc').value.trim()) q.set('location', $('#evLoc').value.trim());
+    if (c) q.set('authuser', c.email);
+    window.open('https://calendar.google.com/calendar/render?' + q.toString(), '_blank', 'noopener');
+    closeCreate();
+  });
+  $('#evForm').addEventListener('submit', async function (e) {
     e.preventDefault();
-    var c = S.cals.find(function (x) { return x.key === add.cal; });
+    var c = S.cals.find(function (x) { return x.key === EV.cal; });
+    var title = $('#evTitle').value.trim();
+    if (!title) { $('#evTitle').focus(); $('.evtitlewrap').classList.remove('shake'); void $('.evtitlewrap').offsetWidth; $('.evtitlewrap').classList.add('shake'); return; }
     if (!c) { toast('Pick a calendar first.'); return; }
-    var s = addDays(calStart(), add.day); s.setHours(Math.floor(add.s), (add.s % 1) * 60, 0, 0);
-    var en = new Date(s.getTime() + add.len * 3600 * 1000);
+    var btn = $('#evSave'); btn.disabled = true; btn.textContent = 'Saving…';
     try {
-      await api('/api/calendar/create', { account_id: c.account_id, calendar_id: c.id, title: $('#addWhat').value.trim(), start: s.toISOString(), end: en.toISOString(), time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone });
-      $('#addWhat').value = ''; openAdd(false);
-      toast('Added to ' + c.name + ' in Google Calendar.');
+      var body = { account_id: c.account_id, calendar_id: c.id, title: title, start: evStartDate().toISOString(), end: evEndDate().toISOString(), time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+      if ($('#evLoc').value.trim()) body.location = $('#evLoc').value.trim();
+      var r = await api('/api/calendar/create', body);
+      lastAddedId = r && r.id;
+      closeCreate();
+      toast('Saved to ' + calLabel(c) + ' · ' + EV.date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ', ' + fmtMin(EV.s));
+      RANGE = {};
       loadCalendar();
-    } catch (err) { toast('Couldn’t add it (' + err.message + ').'); }
+      if (cxd.open) loadCX();
+    } catch (err) {
+      btn.disabled = false; btn.textContent = 'Save';
+      toast(err.message === 'end_before_start' ? 'The end time has to be after the start.' : 'Couldn’t save it (' + err.message + ').');
+    }
   });
+  $('#addBtn').addEventListener('click', function () { openCreate({ src: $('#addBtn') }); });
+
+  /* ---------------- calendar, expanded ---------------- */
+  var cxd = $('#calx');
+  var CX = { view: innerWidth < 760 ? 'day' : 'week', at: startOfDay(new Date()), mini: null, events: [], req: 0, scrolled: '' };
+  try { var v0 = localStorage.getItem('cockpit.calView'); if (v0 && innerWidth >= 760) CX.view = v0; } catch (e) { /* default */ }
+  function cxRange() {
+    var a = CX.at;
+    if (CX.view === 'day') return [a, addDays(a, 1)];
+    if (CX.view === 'week') { var s = addDays(a, -a.getDay()); return [s, addDays(s, 7)]; }
+    if (CX.view === 'month') { var f = new Date(a.getFullYear(), a.getMonth(), 1), s2 = addDays(f, -f.getDay()); return [s2, addDays(s2, 42)]; }
+    return [a, addDays(a, 14)];
+  }
+  function cxTitle() {
+    var r = cxRange(), a = CX.at, last = addDays(r[1], -1);
+    if (CX.view === 'day') return a.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    if (CX.view === 'month') return a.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    if (CX.view === 'week' && r[0].getMonth() === last.getMonth()) return r[0].toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    var y = r[0].getFullYear() !== last.getFullYear();
+    return r[0].toLocaleDateString(undefined, { month: 'short', day: CX.view === 'agenda' ? 'numeric' : undefined, year: y ? 'numeric' : undefined }) + ' – ' + last.toLocaleDateString(undefined, { month: 'short', day: CX.view === 'agenda' ? 'numeric' : undefined, year: 'numeric' });
+  }
+  function openCalX() {
+    CX.at = startOfDay(new Date()); CX.mini = null; CX.scrolled = ''; CX.events = S.events.slice();
+    renderCX();
+    if (!cxd.open) { cxd.showModal(); growFrom(cxd, lastSrc); }
+    scrollCX();
+    loadCX();
+  }
+  function closeCalX() { hidePop(); shrinkClose(cxd); }
+  $('#cxClose').addEventListener('click', closeCalX);
+  cxd.addEventListener('cancel', function (e) { e.preventDefault(); if (!$('#evPop').hidden) { hidePop(); return; } closeCalX(); });
+  async function loadCX() {
+    var r = cxRange(), id = ++CX.req;
+    $('#cxLoad').hidden = false;
+    try {
+      var ev = await fetchRange(r[0], r[1]);
+      if (id !== CX.req) return;
+      CX.events = ev; CX.err = null;
+    } catch (e) { if (id !== CX.req) return; CX.err = e.message; }
+    $('#cxLoad').hidden = true;
+    renderCXMain();
+  }
+  function go(view, at) {
+    if (view) { CX.view = view; try { localStorage.setItem('cockpit.calView', view); } catch (e) { /* not kept */ } }
+    if (at) CX.at = startOfDay(at);
+    CX.mini = null; hidePop();
+    renderCX(); scrollCX(); loadCX();
+  }
+  function step(n) {
+    var a = CX.at;
+    if (CX.view === 'day') go(null, addDays(a, n));
+    else if (CX.view === 'week') go(null, addDays(a, 7 * n));
+    else if (CX.view === 'month') go(null, new Date(a.getFullYear(), a.getMonth() + n, 1));
+    else go(null, addDays(a, 14 * n));
+  }
+  $('#cxToday').addEventListener('click', function () { go(null, new Date()); });
+  $('#cxPrev').addEventListener('click', function () { step(-1); });
+  $('#cxNext').addEventListener('click', function () { step(1); });
+  $('#cxSeg').addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (b) go(b.dataset.v); });
+  $('#cxCreate').addEventListener('click', function () { var t = new Date(); openCreate({ date: CX.view === 'day' || CX.at > t ? CX.at : t, src: $('#cxCreate') }); });
+  document.addEventListener('keydown', function (e) {
+    if (!cxd.open || evd.open || modal.open || e.metaKey || e.ctrlKey || e.altKey || e.target.closest('input, select, textarea')) return;
+    var k = e.key.toLowerCase(), map = { d: 'day', w: 'week', m: 'month', a: 'agenda' };
+    if (map[k]) { go(map[k]); e.preventDefault(); }
+    else if (k === 't') { go(null, new Date()); e.preventDefault(); }
+    else if (k === 'c') { openCreate({ date: CX.at > new Date() ? CX.at : new Date() }); e.preventDefault(); }
+    else if (k === 'arrowleft' || k === 'p' || k === 'k') { step(-1); e.preventDefault(); }
+    else if (k === 'arrowright' || k === 'n' || k === 'j') { step(1); e.preventDefault(); }
+  });
+
+  function renderCX() {
+    $('#cxTitle').textContent = cxTitle();
+    cxd.querySelectorAll('#cxSeg [data-v]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === CX.view)); });
+    renderCXSide(); renderCXMain();
+  }
+  function renderCXSide() {
+    $('#cxMini').innerHTML = miniMonth(CX.mini || CX.at, CX.at, CX.view === 'month' ? null : cxRange());
+    $('#cxCals').innerHTML = '<p class="cxlab">My calendars</p>' + calListHtml();
+  }
+  $('#cxMini').addEventListener('click', function (e) {
+    var nav = e.target.closest('[data-mm]'), day = e.target.closest('[data-mmd]');
+    if (nav) { var m = CX.mini || CX.at; CX.mini = new Date(m.getFullYear(), m.getMonth() + +nav.dataset.mm, 1); renderCXSide(); return; }
+    if (day) go(null, parseIso(day.dataset.mmd));
+  });
+  $('#cxCals').addEventListener('click', function (e) { var b = e.target.closest('button[data-cal]'); if (b) toggleCal(b.dataset.cal); });
+
+  function renderCXMain() {
+    var el = $('#cxMain');
+    CX.list = calsInView(CX.events);
+    if (!S.calAccounts.length && S.calLoaded) { el.innerHTML = '<div class="empty"><b>No Google account connected.</b>Connect it once; every device uses the same connection.<button type="button" class="btnl" data-connect="1">Connect Google</button></div>'; return; }
+    var r = cxRange(), days = [], oldSc = $('#cxScroll'), keepTop = oldSc ? oldSc.scrollTop : null;
+    if (CX.view === 'day' || CX.view === 'week') {
+      for (var d = r[0]; d < r[1]; d = addDays(d, 1)) days.push(d);
+      el.innerHTML = cxGrid(days);
+      if (keepTop != null) $('#cxScroll').scrollTop = keepTop; // a refresh keeps the place
+    }
+    else if (CX.view === 'month') el.innerHTML = cxMonth();
+    else el.innerHTML = cxAgenda();
+    el.dataset.view = CX.view;
+    if (CX.err) el.insertAdjacentHTML('afterbegin', '<div class="cxerr">' + SV2(IC.warn, 2.2) + 'Couldn’t load these dates (' + esc(CX.err) + '). <button type="button" class="linkbtn" id="cxRetry">Try again</button></div>');
+    drawGhost();
+  }
+  $('#cxMain').addEventListener('click', function (e) {
+    if (e.target.id === 'cxRetry') { RANGE = {}; loadCX(); return; }
+    var evb = e.target.closest('[data-ev]');
+    if (evb) { showPop(CX.list[+evb.dataset.ev], evb); return; }
+    var gd = e.target.closest('[data-goday]');
+    if (gd) { go('day', parseIso(gd.dataset.goday)); return; }
+    hidePop();
+    var col = e.target.closest('.tgc');
+    if (col) { // click an empty slot: start a new event there, on the half hour, like Google Calendar
+      var rc = col.getBoundingClientRect(), m = Math.floor((e.clientY - rc.top) / rc.height * 48) * 30;
+      openCreate({ date: parseIso(col.dataset.col), start: Math.max(0, Math.min(m, 1410)), src: col });
+      return;
+    }
+    var cell = e.target.closest('.mc');
+    if (cell) openCreate({ date: parseIso(cell.dataset.cell), src: cell });
+  });
+
+  // Side-by-side columns for events that overlap, as Google does.
+  function layoutDay(items) {
+    items.sort(function (a, b) { return a.s - b.s || b.e - a.e; });
+    var group = [], end = -1, cols = [];
+    var flush = function () { group.forEach(function (x) { x.cols = cols.length; }); group = []; cols = []; };
+    items.forEach(function (x) {
+      var ve = Math.max(x.e, x.s + 25);
+      if (x.s >= end && group.length) flush();
+      var i = cols.findIndex(function (ce) { return ce <= x.s; }); if (i < 0) { i = cols.length; cols.push(0); }
+      cols[i] = ve; x.col = i; group.push(x); end = Math.max(end, ve);
+    });
+    flush();
+    return items;
+  }
+  function cxGrid(days) {
+    var now = new Date(), list = CX.list, n = days.length;
+    var h = '<div class="tgs" id="cxScroll" style="--n:' + n + '"><div class="tgtop"><div class="tgh"><div class="tgz">' + esc(tzShort()) + '</div>' + days.map(function (d) {
+      return '<div class="tgd' + (sameDay(d, now) ? ' today' : '') + (d < startOfDay(now) ? ' pastd' : '') + '"><span>' + esc(d.toLocaleDateString(undefined, { weekday: 'short' })) + '</span><button type="button" class="tgn" data-goday="' + isoDay(d) + '" aria-label="Open ' + esc(d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })) + '">' + d.getDate() + '</button></div>';
+    }).join('') + '</div><div class="tga"><div class="tgz"></div>' + days.map(function (d) {
+      var nx = addDays(d, 1);
+      return '<div class="tgac">' + list.map(function (e, i) { return e.all_day && e.s < nx && e.e > d ? '<button type="button" class="xad" data-ev="' + i + '" style="--c:' + esc(calOf(e).color) + '">' + esc(e.title) + '</button>' : ''; }).join('') + '</div>';
+    }).join('') + '</div></div><div class="tgb"><div class="tgt">';
+    for (var x = 1; x < 24; x++) h += '<span style="top:calc(var(--hh) * ' + x + ')">' + fmtMin(x * 60).replace(':00', '') + '</span>';
+    h += '</div>';
+    days.forEach(function (d) {
+      var nx = addDays(d, 1);
+      var items = [];
+      list.forEach(function (e, i) {
+        if (e.all_day || !(e.s < nx && e.e > d)) return;
+        items.push({ i: i, ev: e, s: e.s < d ? 0 : minOf(e.s), e: e.e >= nx ? 1440 : minOf(e.e) });
+      });
+      h += '<div class="tgc' + (sameDay(d, now) ? ' today' : '') + (d.getDay() === 0 || d.getDay() === 6 ? ' wk' : '') + '" data-col="' + isoDay(d) + '">';
+      layoutDay(items).forEach(function (x) {
+        var e = x.ev, c = calOf(e), dur = x.e - x.s, short = dur < 45;
+        var w = 100 / x.cols, left = x.col * w, width = x.col === x.cols - 1 ? w : w * 1.6;
+        h += '<button type="button" class="xev' + (short ? ' short' : '') + (e.e <= now ? ' past' : '') + (lastAddedId && e.id === lastAddedId ? ' fresh' : '') + '" data-ev="' + x.i + '" style="--c:' + esc(c.color) + ';--bg:' + tint(c.color) + ';top:calc(var(--hh) * ' + (x.s / 60) + ');height:calc(var(--hh) * ' + (Math.max(dur, 20) / 60) + ' - 2px);left:calc(' + left + '% + 1px);width:calc(' + Math.min(width, 100 - left) + '% - 4px);z-index:' + (2 + x.col) + '">' +
+          '<b>' + esc(e.title) + (short ? '<small>, ' + fmtMin(minOf(e.s)) + '</small>' : '') + '</b>' + (short ? '' : '<small>' + fmtMin(minOf(e.s)) + ' – ' + fmtMin(minOf(e.e)) + (e.location && dur >= 60 ? '<br>' + esc(e.location) : '') + '</small>') + '</button>';
+      });
+      if (sameDay(d, now)) h += '<div class="xnow" style="top:calc(var(--hh) * ' + (minOf(now) / 60) + ')" aria-label="Now"></div>';
+      h += '</div>';
+    });
+    return h + '</div></div>';
+  }
+  function scrollCX() {
+    var sc = $('#cxScroll'), key = CX.view + isoDay(cxRange()[0]);
+    if (!sc || CX.scrolled === key) return;
+    CX.scrolled = key;
+    var r = cxRange(), now = new Date(), hh = sc.querySelector('.tgc') ? sc.querySelector('.tgc').offsetHeight / 24 : 48;
+    var firstEv = CX.list.filter(function (e) { return !e.all_day; }).map(function (e) { return minOf(e.s); }).sort(function (a, b) { return a - b; })[0];
+    var hour = now >= r[0] && now < r[1] ? Math.max(0, minOf(now) / 60 - 2) : Math.min(7.5, firstEv != null ? firstEv / 60 - .5 : 7.5);
+    sc.scrollTop = Math.max(0, hour * hh);
+  }
+  function cxMonth() {
+    var r = cxRange(), list = CX.list, m = CX.at.getMonth(), today = startOfDay(new Date());
+    var h = '<div class="mgrid"><div class="mwk">';
+    for (var w = 0; w < 7; w++) h += '<span>' + esc(addDays(r[0], w).toLocaleDateString(undefined, { weekday: 'short' })) + '</span>';
+    h += '</div><div class="mcells">';
+    for (var i = 0; i < 42; i++) {
+      var d = addDays(r[0], i), nx = addDays(d, 1);
+      var evs = list.map(function (e, k) { return { e: e, k: k }; }).filter(function (x) { return x.e.s < nx && x.e.e > d; }).sort(function (a, b) { return (b.e.all_day ? 1 : 0) - (a.e.all_day ? 1 : 0) || a.e.s - b.e.s; });
+      h += '<div class="mc' + (d.getMonth() !== m ? ' out' : '') + (sameDay(d, today) ? ' today' : '') + (d < today ? ' pastd' : '') + '" data-cell="' + isoDay(d) + '"><button type="button" class="mcn" data-goday="' + isoDay(d) + '">' + (d.getDate() === 1 ? esc(d.toLocaleDateString(undefined, { month: 'short' })) + ' 1' : d.getDate()) + '</button>' +
+        evs.slice(0, 3).map(function (x) { var c = calOf(x.e); return x.e.all_day ? '<button type="button" class="mch ad" data-ev="' + x.k + '" style="--c:' + esc(c.color) + '">' + esc(x.e.title) + '</button>' : '<button type="button" class="mch' + (x.e.e <= new Date() ? ' past' : '') + '" data-ev="' + x.k + '" style="--c:' + esc(c.color) + '"><i></i><span>' + fmtMin(minOf(x.e.s)) + '</span> ' + esc(x.e.title) + '</button>'; }).join('') +
+        (evs.length > 3 ? '<button type="button" class="mcm" data-goday="' + isoDay(d) + '">' + (evs.length - 3) + ' more</button>' : '') + '</div>';
+    }
+    return h + '</div></div>';
+  }
+  function cxAgenda() {
+    var r = cxRange(), list = CX.list, today = startOfDay(new Date()), h = '<div class="ag">', any = false;
+    for (var d = r[0]; d < r[1]; d = addDays(d, 1)) {
+      var nx = addDays(d, 1), dd = d;
+      var evs = list.map(function (e, k) { return { e: e, k: k }; }).filter(function (x) { return x.e.s < nx && x.e.e > dd; }).sort(function (a, b) { return (b.e.all_day ? 1 : 0) - (a.e.all_day ? 1 : 0) || a.e.s - b.e.s; });
+      if (!evs.length) continue;
+      any = true;
+      h += '<section class="agd' + (sameDay(d, today) ? ' today' : '') + '"><button type="button" class="agdate" data-goday="' + isoDay(d) + '"><b>' + d.getDate() + '</b><span>' + esc(d.toLocaleDateString(undefined, { month: 'short', weekday: 'short' })) + '</span></button><div class="agl">' +
+        evs.map(function (x) { var e = x.e, c = calOf(e); return '<button type="button" class="agr' + (e.e <= new Date() ? ' past' : '') + '" data-ev="' + x.k + '"><i style="background:' + esc(c.color) + '"></i><span class="agt">' + (e.all_day ? 'All day' : fmtMin(minOf(e.s)) + ' – ' + fmtMin(minOf(e.e))) + '</span><span class="agn"><b>' + esc(e.title) + '</b>' + (e.location ? '<small>' + esc(e.location) + '</small>' : '') + '</span><span class="agc">' + esc(calLabel(c)) + '</span></button>'; }).join('') + '</div></section>';
+    }
+    return h + (any ? '' : '<div class="empty"><b>Nothing on the calendar.</b>Nothing for these two weeks on the calendars shown.</div>') + '</div>';
+  }
+
+  // The placeholder block that previews the new event while the add dialog is open, like Google's "(No title)".
+  function drawGhost() {
+    var old = cxd.querySelector('.ghost'); if (old) old.remove();
+    if (!evd.open || !cxd.open || !EV.date) return;
+    var kc = S.cals.find(function (x) { return x.key === EV.cal; });
+    cxd.style.setProperty('--ac', kc ? kc.color : '#1A73E8');
+    var col = cxd.querySelector('.tgc[data-col="' + isoDay(EV.date) + '"]');
+    if (col) {
+      var g = document.createElement('div'); g.className = 'ghost';
+      g.style.cssText = 'top:calc(var(--hh) * ' + EV.s / 60 + ');height:calc(var(--hh) * ' + Math.max(EV.e - EV.s, 20) / 60 + ' - 2px)';
+      g.innerHTML = '<b>' + esc($('#evTitle').value.trim() || '(No title)') + '</b><small>' + fmtMin(EV.s) + ' – ' + fmtMin(EV.e) + '</small>';
+      col.appendChild(g);
+      return;
+    }
+    var cell = cxd.querySelector('.mc[data-cell="' + isoDay(EV.date) + '"]');
+    if (cell) { var gm = document.createElement('div'); gm.className = 'ghost gm'; gm.textContent = ($('#evTitle').value.trim() || '(No title)') + ' · ' + fmtMin(EV.s); cell.appendChild(gm); }
+  }
+
+  // Event details card, next to the event.
+  var pop = $('#evPop');
+  function showPop(ev, anchor) {
+    if (!ev) return;
+    var c = calOf(ev);
+    pop.style.setProperty('--c', c.color);
+    pop.innerHTML = '<div class="eph">' + (ev.link ? '<a class="ix" href="' + esc(ev.link) + '" target="_blank" rel="noopener" title="Open in Google Calendar" aria-label="Open in Google Calendar">' + SV2(IC.ext, 2.2) + '</a>' : '') + '<button type="button" class="ix" data-pclose aria-label="Close">' + SV2(IC.x, 2.4) + '</button></div>' +
+      '<div class="epr"><i class="eps"></i><div><h3>' + esc(ev.title) + '</h3><p>' + esc(whenText(ev)) + '</p></div></div>' +
+      (ev.location ? '<div class="epr"><span class="epi">' + SV2(IC.pin) + '</span><div>' + (/^https?:\/\//.test(ev.location) ? '<a href="' + esc(ev.location) + '" target="_blank" rel="noopener">' + esc(ev.location) + '</a>' : '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(ev.location) + '" target="_blank" rel="noopener">' + esc(ev.location) + '</a>') + '</div></div>' : '') +
+      '<div class="epr"><span class="epi">' + SV2(IC.cal) + '</span><div><b>' + esc(calLabel(c)) + '</b>' + (c.email ? '<small>' + esc(c.email) + '</small>' : '') + '</div></div>' +
+      (ev.link ? '<a class="epgo" href="' + esc(ev.link) + '" target="_blank" rel="noopener">Open in Google Calendar ' + SV2(IC.ext, 2.2) + '</a>' : '');
+    pop.hidden = false;
+    var r = anchor.getBoundingClientRect(), w = pop.offsetWidth, ht = pop.offsetHeight, x = r.right + 10;
+    if (x + w > innerWidth - 12) x = r.left - w - 10;
+    if (x < 12) x = Math.max(12, Math.min(innerWidth - w - 12, r.left + r.width / 2 - w / 2));
+    var y = Math.max(12, Math.min(innerHeight - ht - 12, r.top));
+    if (x === Math.max(12, Math.min(innerWidth - w - 12, r.left + r.width / 2 - w / 2))) y = r.bottom + 8 + ht < innerHeight ? r.bottom + 8 : Math.max(12, r.top - ht - 8);
+    pop.style.left = x + 'px'; pop.style.top = y + 'px';
+    if (!calm()) pop.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    pop.querySelector('[data-pclose]').focus({ preventScroll: true });
+  }
+  function hidePop() { pop.hidden = true; }
+  pop.addEventListener('click', function (e) { if (e.target.closest('[data-pclose]')) hidePop(); });
+  cxd.addEventListener('click', function (e) { if (!pop.hidden && !e.target.closest('#evPop, [data-ev]')) hidePop(); });
+  cxd.addEventListener('scroll', hidePop, true);
 
   /* ---------------- connect Google ---------------- */
   async function connectGoogle() {
@@ -494,17 +910,16 @@
     return 'https://mail.google.com/mail/u/' + encodeURIComponent(a ? a.email_address : '0') + '/#all/' + encodeURIComponent(m.thread_id || '');
   };
 
+  // The last four weeks of sales as bars, one a day, today on the right.
+  function salesChart() {
+    var d0 = startOfDay(new Date()), days = [], list = salesInView();
+    for (var i = 27; i >= 0; i--) { var a = addDays(d0, -i), b = addDays(a, 1); var l = list.filter(function (s) { var t = new Date(s.sold_at); return t >= a && t < b; }); days.push({ d: a, amt: l.reduce(function (x, s) { return x + Number(s.amount); }, 0), n: l.length }); }
+    var max = Math.max.apply(null, days.map(function (x) { return x.amt; }).concat([1])), total = days.reduce(function (x, y) { return x + y.amt; }, 0);
+    return '<div><p class="mlabel">Last 4 weeks · ' + money(total) + '</p><div class="schart" role="img" aria-label="Daily sales for the last four weeks">' + days.map(function (x, i) {
+      return '<span class="sb' + (i === 27 ? ' now' : '') + '" title="' + esc(x.d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ': ' + money(x.amt) + ' · ' + x.n + ' sale' + (x.n === 1 ? '' : 's')) + '"><i style="height:' + (x.amt ? Math.max(4, x.amt / max * 100) : 0) + '%;--i:' + i + '"></i></span>';
+    }).join('') + '</div><div class="saxis"><span>' + esc(days[0].d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })) + '</span><span>Today</span></div></div>';
+  }
   var VIEWS = {
-    calendar: function () {
-      var evs = eventsInView().sort(function (a, b) { return a.s - b.s; }), start = calStart(), body = '';
-      for (var i = 0; i < 7; i++) {
-        var d = addDays(start, i), n = addDays(d, 1);
-        var list = evs.filter(function (e) { return e.s < n && e.e > d; });
-        body += '<div><p class="mlabel">' + (i === 0 ? 'Today · ' : '') + d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) + '</p><div class="mlist">' +
-          (list.length ? list.map(function (e) { var c = calOf(e); return '<div class="mrow"><time>' + (e.all_day ? 'All day' : fmtTime(e.s)) + '</time><span class="grow">' + esc(e.title) + (e.location ? '<small>' + esc(e.location) + '</small>' : '') + '</span><span class="cotag" style="background:' + tint(c.color) + ';color:#10292C">' + esc(c.name) + '</span></div>'; }).join('') : '<div class="mrow"><span class="grow" style="color:var(--muted)">Nothing scheduled</span></div>') + '</div></div>';
-      }
-      return { t: 'Calendar', sub: who() + ' · next 7 days · Google Calendar', note: S.cals.filter(function (c) { return c.shown; }).length + ' calendars shown', body: body };
-    },
     email: function () {
       var groups = S.accounts.filter(function (a) { return inView(mailCo(a.id)); });
       var body = S.digest ? '<p class="mtext">' + esc(plainSummary(S.digest.summary)) + '</p>' : '';
@@ -513,7 +928,7 @@
         return '<div><p class="mlabel">' + esc(a.email_address) + ' ' + tag(mailCo(a.id)) + ' · ' + list.length + (S.chatList ? ' to do first' : ' need a reply') + '</p><div class="mlist">' +
           (list.length ? list.map(function (m) {
             var steps = Array.isArray(m.thread_next_steps) ? m.thread_next_steps.slice(0, 2).join(' · ') : '';
-            return '<div class="msg" data-msg="' + esc(m.id) + '"><div class="l1"><b>' + esc(m.from_name || m.from_address) + '</b><span>' + esc(m.subject || '(no subject)') + '</span><small>' + new Date(m.received_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '</small></div>' +
+            return '<div class="msg" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><div class="l1"><b>' + esc(m.from_name || m.from_address) + '</b><span>' + esc(m.subject || '(no subject)') + '</span><small>' + new Date(m.received_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '</small></div>' +
               (m.why ? '<p><b>Why first:</b> ' + esc(m.why) + '</p>' : '') + '<p>' + esc(m.summary || m.snippet || '') + '</p>' + (steps ? '<p><b>Next:</b> ' + esc(steps) + '</p>' : '') +
               '<div class="acts2"><a href="' + esc(gmailLink(m)) + '" target="_blank" rel="noopener">Reply in Gmail ↗</a><button type="button" data-archive="' + esc(m.id) + '">Done · archive</button></div></div>';
           }).join('') : '<div class="msg"><p style="color:var(--muted)">' + (S.chatList ? 'Nothing left to do first here.' : 'Nothing needs a reply here.') + '</p></div>') + '</div></div>';
@@ -522,13 +937,14 @@
       var fresh = S.recent.filter(function (m) { return inView(mailCo(m.account_id)); });
       if (S.accounts.length) body += '<div><p class="mlabel">New in the last 24 hours · ' + fresh.length + '</p><div class="mlist">' +
         (fresh.length ? fresh.slice(0, 30).map(function (m) {
-          return '<div class="msg"><div class="l1"><b>' + esc(m.from_name || m.from_address || '') + '</b><span>' + esc(m.subject || '(no subject)') + '</span><small>' + new Date(m.received_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '</small></div>' +
+          return '<div class="msg"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><div class="l1"><b>' + esc(m.from_name || m.from_address || '') + '</b><span>' + esc(m.subject || '(no subject)') + '</span><small>' + new Date(m.received_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '</small></div>' +
             '<p>' + esc(m.summary || m.snippet || '') + '</p><div class="acts2"><a href="' + esc(gmailLink(m)) + '" target="_blank" rel="noopener">Open in Gmail ↗</a></div></div>';
         }).join('') : '<div class="msg"><p style="color:var(--muted)">No new mail in the last 24 hours.</p></div>') + '</div></div>';
       return { t: 'ChatGPT’s summary', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
     },
     sales: function () {
       var body = '<div class="mstats">' + salesCos().map(function (co) { var n = salesNumbers([co]); return '<div class="mstat"><span>' + esc(CO[co].short) + ' today</span><b class="num">' + money(n.today) + '</b><span>' + money(n.week) + ' last 7 days · ' + n.wn + ' sale' + (n.wn === 1 ? '' : 's') + '</span></div><div class="mstat"><span>' + esc(CO[co].short) + ' this month</span><b class="num">' + money(n.month) + '</b><span>' + (n.pct === null ? 'first month' : (n.pct >= 0 ? '▲' : '▼') + Math.abs(n.pct) + '% vs last month') + '</span></div>'; }).join('') + '</div>';
+      body += salesChart();
       var m0 = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       var prod = {};
       salesInView().filter(function (s) { return new Date(s.sold_at) >= m0; }).forEach(function (s) { var k = (s.items && s.items.length ? s.items.join(', ') : 'Sale') + '|' + storeCo(s.store_id); prod[k] = prod[k] || { n: 0, amt: 0 }; prod[k].n++; prod[k].amt += Number(s.amount); });
@@ -616,9 +1032,11 @@
 
   var modal = $('#modal');
   function openView(k) {
+    if (k === 'calendar') { openCalX(); return; }
     var v = VIEWS[k] && VIEWS[k](); if (!v) return;
-    var ic = ICONS[k];
+    var ic = ICONS[k], wasOpen = modal.open;
     $('#mIcon').style.background = ic[0];
+    modal.style.setProperty('--mbg', ic[0]);
     $('#mIcon').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ic[1] + '</svg>';
     $('#mTitle').textContent = v.t; $('#mSub').innerHTML = v.sub; $('#mNote').textContent = v.note || '';
     modal.classList.toggle('framed', !!v.frame);
@@ -635,8 +1053,10 @@
     }
     modal.dataset.view = k;
     if (!modal.open) { if (typeof modal.showModal === 'function') modal.showModal(); else modal.setAttribute('open', ''); }
+    if (!wasOpen) growFrom(modal, lastSrc);
   }
-  function closeView() { if (modal.open) { if (modal.close) modal.close(); else modal.removeAttribute('open'); } $('#mBody').innerHTML = ''; }
+  function closeView() { if (modal.open) { if (modal.close) shrinkClose(modal); else modal.removeAttribute('open'); } }
+  modal.addEventListener('cancel', function (e) { e.preventDefault(); closeView(); });
   $('#mClose').addEventListener('click', closeView);
   modal.addEventListener('click', function (e) { if (e.target === modal) closeView(); });
   modal.addEventListener('close', function () { $('#mBody').innerHTML = ''; });

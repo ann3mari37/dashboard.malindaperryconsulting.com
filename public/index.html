@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="cockpit.css">
+<link rel="stylesheet" href="views.css">
 <script src="config.js"></script>
 <script src="session.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
@@ -61,14 +62,6 @@
         <div class="cal" id="cal"></div>
       </div>
 
-      <form class="addpop" id="addPop" hidden>
-        <div><label for="addWhat">What</label><input id="addWhat" placeholder="e.g. Call with the publisher" autocomplete="off" required></div>
-        <div><label>Calendar</label><div class="pick" id="pickCal"></div></div>
-        <div><label>Day</label><div class="pick" id="pickDay"></div></div>
-        <div><label>Time</label><div class="pick" id="pickTime"></div></div>
-        <div><label>How long</label><div class="pick" id="pickLen"></div></div>
-        <div class="row"><button type="button" class="chip" id="addCancel">Cancel</button><button type="submit" class="chip primary">Add to Google Calendar</button></div>
-      </form>
     </section>
 
     <div class="side">
@@ -111,7 +104,7 @@
 <dialog class="modal sod" id="sod" aria-labelledby="sodTitle">
   <div class="mb">
     <h2 id="sodTitle">Would you like to start your day?</h2>
-    <p>ChatGPT opens in a new tab with your start-of-day prompt ready: today’s calendar, tasks and email. Send it to begin.</p>
+    <p>Have ChatGPT take a look at your tasks and emails to create a summary for you.</p>
     <div class="row"><button type="button" class="chip" id="sodLater">Not now</button><button type="button" class="chip primary" id="sodGo">☀ Start my day</button></div>
   </div>
 </dialog>
@@ -120,6 +113,72 @@
   <div class="mh"><span class="ic" id="mIcon"></span><div><h2 id="mTitle"></h2><p id="mSub"></p></div><button class="x" type="button" id="mClose" aria-label="Close">✕</button></div>
   <div class="mb" id="mBody"></div>
   <div class="mf" id="mFoot"><span class="note" id="mNote"></span><span class="gos"><a class="go alt" id="mGo2" href="#" target="_blank" rel="noopener" hidden></a><a class="go" id="mGo" href="#" target="_blank" rel="noopener"></a></span></div>
+</dialog>
+
+<!-- CALENDAR, EXPANDED: Day / Week / Month / Schedule, like Google Calendar -->
+<dialog class="calx" id="calx" aria-labelledby="cxTitle">
+  <header class="cxh">
+    <span class="cxic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+    <button type="button" class="cxtoday" id="cxToday" title="Today (T)">Today</button>
+    <div class="cxnav">
+      <button type="button" id="cxPrev" aria-label="Previous" title="Previous (←)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <button type="button" id="cxNext" aria-label="Next" title="Next (→)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+    <h2 class="cxtitle" id="cxTitle" aria-live="polite"></h2>
+    <span class="cxload" id="cxLoad" hidden aria-hidden="true"></span>
+    <div class="cxseg" role="group" aria-label="Calendar view" id="cxSeg">
+      <button type="button" data-v="day" title="Day (D)">Day</button><button type="button" data-v="week" title="Week (W)">Week</button><button type="button" data-v="month" title="Month (M)">Month</button><button type="button" data-v="agenda" title="Schedule (A)">Schedule</button>
+    </div>
+    <a class="cxg" href="https://calendar.google.com" target="_blank" rel="noopener" title="Open Google Calendar" aria-label="Open Google Calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg></a>
+    <button type="button" class="cxx" id="cxClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+  </header>
+  <div class="cxb">
+    <aside class="cxs" aria-label="Calendar tools">
+      <button type="button" class="cxcreate" id="cxCreate" title="Create (C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Create</button>
+      <div id="cxMini"></div>
+      <div class="cxcals" id="cxCals"></div>
+      <p class="cxkeys"><kbd>T</kbd> today · <kbd>D</kbd><kbd>W</kbd><kbd>M</kbd><kbd>A</kbd> views<br><kbd>←</kbd><kbd>→</kbd> move · <kbd>C</kbd> create</p>
+    </aside>
+    <main class="cxm" id="cxMain"></main>
+  </div>
+  <div class="evpop" id="evPop" hidden role="dialog" aria-label="Event details"></div>
+</dialog>
+
+<!-- ADD EVENT: Gmail / Google Calendar style quick create -->
+<dialog class="evdlg" id="evDlg" aria-label="New event">
+  <form id="evForm" novalidate>
+    <div class="evbar"><span class="evkind"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>New event</span><button type="button" class="ix" id="evClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <div class="evtitlewrap"><input id="evTitle" class="evtitle" placeholder="Add title" aria-label="Title" autocomplete="off" maxlength="300"><span class="evline" aria-hidden="true"></span></div>
+    <div class="evrow evwhenrow">
+      <span class="evi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+      <div class="evwhen">
+        <div class="evline1">
+          <button type="button" class="evfield" id="evDateBtn" aria-haspopup="true" aria-expanded="false"></button>
+          <label class="sr" for="evStart">Starts</label><select class="evfield evsel" id="evStart"></select>
+          <span class="evdash" aria-hidden="true">–</span>
+          <label class="sr" for="evEnd">Ends</label><select class="evfield evsel" id="evEnd"></select>
+        </div>
+        <div class="evsub" id="evTz"></div>
+        <div class="evmini" id="evMini" hidden></div>
+      </div>
+    </div>
+    <div class="evrow">
+      <span class="evi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
+      <input id="evLoc" class="evfield evgrow" placeholder="Add location or video link" aria-label="Location" maxlength="300" autocomplete="off">
+    </div>
+    <div class="evrow">
+      <span class="evi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+      <div class="evcal">
+        <button type="button" class="evfield evgrow" id="evCalBtn" aria-haspopup="listbox" aria-expanded="false"></button>
+        <div class="evmenu" id="evCalMenu" role="listbox" aria-label="Calendar" hidden></div>
+      </div>
+    </div>
+    <div class="evbusy" id="evBusy" hidden></div>
+    <div class="evfoot">
+      <button type="button" class="evmore" id="evMore" title="Open in Google Calendar with guests, description, repeat and more">More options</button>
+      <button type="submit" class="evsave" id="evSave">Save</button>
+    </div>
+  </form>
 </dialog>
 
 <div class="toast" id="toast" role="status"></div>
