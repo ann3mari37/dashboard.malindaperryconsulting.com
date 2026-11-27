@@ -314,7 +314,8 @@
   var SIDE_KEY = 'cockpit.calSide';
   function setCalSide(open) {
     $('.calzone').classList.toggle('side-closed', !open);
-    var mb = $('#calMenuBtn'); mb.setAttribute('aria-expanded', String(open)); mb.title = open ? 'Hide calendars' : 'Show calendars'; mb.setAttribute('aria-label', mb.title);
+    var mb = $('#calMenuBtn'); mb.setAttribute('aria-expanded', String(open)); mb.title = open ? 'Hide the calendar list' : 'Show the calendar list'; mb.setAttribute('aria-label', mb.title);
+    mb.innerHTML = open ? '<span class="mbi" aria-hidden="true">☰</span><span class="mbt">Collapse</span>' : '<span class="mbi" aria-hidden="true">☰</span>';
     try { localStorage.setItem(SIDE_KEY, open ? '1' : '0'); } catch (e) { /* not kept */ }
   }
   (function () { var v = null; try { v = localStorage.getItem(SIDE_KEY); } catch (e) { /* default */ } setCalSide(v !== '0'); })();
@@ -384,6 +385,19 @@
   /* email */
   var initials = function (m) { var n = (m.from_name || m.from_address || '?').replace(/[^A-Za-z ]/g, '').trim().split(/\s+/); return ((n[0] || '?')[0] + ((n[1] || '')[0] || '')).toUpperCase(); };
   var acctColor = function (id) { var a = S.accounts.find(function (x) { return x.id === id; }); return (a && a.color) || '#E0602E'; };
+  // Gmail's way of dating mail in a list: the time for today, "Nov 24" for earlier this year, the full date before that.
+  var gmTime = function (iso) {
+    var d = new Date(iso), now = new Date();
+    if (sameDay(d, now)) return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    return d.toLocaleDateString(undefined, d.getFullYear() === now.getFullYear() ? { month: 'short', day: 'numeric' } : { month: 'numeric', day: 'numeric', year: '2-digit' });
+  };
+  var sender = function (m) { return m.from_name || m.from_address || '(unknown sender)'; };
+  // One email as Gmail shows it: sender, subject, then the summary; the address and full date on hover.
+  function mailHead(m) {
+    return '<div class="l1"><b class="from" title="' + esc(m.from_address || '') + '">' + esc(sender(m)) + '</b>' + (m.from_name && m.from_address ? '<small class="addr">&lt;' + esc(m.from_address) + '&gt;</small>' : '') + (S.view === 'all' ? tag(mailCo(m.account_id)) : '') +
+      '<time title="' + esc(new Date(m.received_at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })) + '">' + esc(gmTime(m.received_at)) + '</time></div>' +
+      '<div class="subj">' + esc(m.subject || '(no subject)') + '</div>';
+  }
   function renderMail() {
     var list = needsInView();
     var fresh = S.recent.filter(function (m) { return inView(mailCo(m.account_id)); }).length;
@@ -396,7 +410,8 @@
     $('#asks').innerHTML = '<p class="lead">' + (S.chatList ? (list.length ? '<span>' + list.length + '</span> to do first · ' + esc(chatName()) : 'All done from ' + esc(chatName()) + '’s list.') : (list.length ? '<span>' + list.length + '</span> need' + (list.length === 1 ? 's' : '') + ' a reply' : 'Nothing needs a reply.') + ' <small>· ChatGPT hasn’t sorted today’s email yet</small>') + '</p>' +
       (S.chatList && S.digest.summary ? '<div class="wait">' + esc(plainSummary(S.digest.summary).slice(0, 220)) + '</div>' : '') +
       list.slice(0, max).map(function (m) {
-        return '<div class="ask" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><span class="tx"><b>' + esc(m.from_name || m.from_address) + ' · ' + esc(m.subject || '(no subject)') + ' ' + (S.view === 'all' ? tag(mailCo(m.account_id)) : '') + '</b><span>' + esc(m.why || m.summary || m.snippet || '') + '</span></span><button class="open2" type="button" data-open-btn="email">Open</button></div>';
+        var more = m.why || m.summary || m.snippet || '';
+        return '<div class="ask gm" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><span class="tx"><span class="r1"><b class="from" title="' + esc(m.from_address || '') + '">' + esc(sender(m)) + '</b>' + (S.view === 'all' ? tag(mailCo(m.account_id)) : '') + '<time>' + esc(gmTime(m.received_at)) + '</time></span><span class="r2"><b>' + esc(m.subject || '(no subject)') + '</b>' + (more ? '<span> – ' + esc(more) + '</span>' : '') + '</span></span><button class="open2" type="button" data-open-btn="email">Open</button></div>';
       }).join('') +
       (list.length > max ? '<div class="wait">+' + (list.length - max) + (S.chatList ? ' more to do first.' : ' more need a reply.') + '</div>' : (S.digest && !S.chatList ? '<div class="wait">' + esc(plainSummary(S.digest.summary).slice(0, 160)) + '</div>' : ''));
   }
@@ -904,11 +919,24 @@
     settings: ['#53625F', '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>']
   };
   var who = function () { return S.view === 'all' ? 'Both businesses' : CO[S.view].name; };
+  // Gmail opens the message in the inbox it came to (authuser = that address). If that Google account isn't signed in
+  // on this browser, Gmail falls back to whichever account is, so each email also says which inbox it is in and offers
+  // Google's own "sign in to this account" step, which comes back to the message afterwards.
+  var acctOf = function (m) { return S.accounts.find(function (x) { return x.id === m.account_id; }); };
   var gmailLink = function (m) {
-    if (m.web_link) return m.web_link;
-    var a = S.accounts.find(function (x) { return x.id === m.account_id; });
-    return 'https://mail.google.com/mail/u/' + encodeURIComponent(a ? a.email_address : '0') + '/#all/' + encodeURIComponent(m.thread_id || '');
+    var a = acctOf(m);
+    if (m.web_link && (!a || m.web_link.indexOf('authuser=') > 0)) return m.web_link;
+    return 'https://mail.google.com/mail/u/?authuser=' + encodeURIComponent(a ? a.email_address : '') + '#all/' + encodeURIComponent(m.thread_id || '');
   };
+  var gmailSignIn = function (m) {
+    var a = acctOf(m);
+    return 'https://accounts.google.com/AddSession?Email=' + encodeURIComponent(a ? a.email_address : '') + '&continue=' + encodeURIComponent(gmailLink(m));
+  };
+  function gmailActs(m, label, extra) {
+    var a = acctOf(m);
+    return '<div class="acts2"><a class="gmgo" href="' + esc(gmailLink(m)) + '" target="_blank" rel="noopener">' + label + ' ↗</a>' + (extra || '') + '</div>' +
+      (a ? '<p class="inbox">In <b>' + esc(a.email_address) + '</b>. Opened the wrong Gmail? <a href="' + esc(gmailSignIn(m)) + '" target="_blank" rel="noopener">Sign in as ' + esc(a.email_address) + '</a></p>' : '');
+  }
 
   // The last four weeks of sales as bars, one a day, today on the right.
   function salesChart() {
@@ -928,17 +956,17 @@
         return '<div><p class="mlabel">' + esc(a.email_address) + ' ' + tag(mailCo(a.id)) + ' · ' + list.length + (S.chatList ? ' to do first' : ' need a reply') + '</p><div class="mlist">' +
           (list.length ? list.map(function (m) {
             var steps = Array.isArray(m.thread_next_steps) ? m.thread_next_steps.slice(0, 2).join(' · ') : '';
-            return '<div class="msg" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><div class="l1"><b>' + esc(m.from_name || m.from_address) + '</b><span>' + esc(m.subject || '(no subject)') + '</span><small>' + new Date(m.received_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '</small></div>' +
+            return '<div class="msg" data-msg="' + esc(m.id) + '"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span>' + mailHead(m) +
               (m.why ? '<p><b>Why first:</b> ' + esc(m.why) + '</p>' : '') + '<p>' + esc(m.summary || m.snippet || '') + '</p>' + (steps ? '<p><b>Next:</b> ' + esc(steps) + '</p>' : '') +
-              '<div class="acts2"><a href="' + esc(gmailLink(m)) + '" target="_blank" rel="noopener">Reply in Gmail ↗</a><button type="button" data-archive="' + esc(m.id) + '">Done · archive</button></div></div>';
+              gmailActs(m, 'Reply in Gmail', '<button type="button" data-archive="' + esc(m.id) + '">Done · archive</button>') + '</div>';
           }).join('') : '<div class="msg"><p style="color:var(--muted)">' + (S.chatList ? 'Nothing left to do first here.' : 'Nothing needs a reply here.') + '</p></div>') + '</div></div>';
       }).join('');
       // The "new" count on the Numbers row is mail from the last 24 hours, so list it here too, or that number points at nothing.
       var fresh = S.recent.filter(function (m) { return inView(mailCo(m.account_id)); });
       if (S.accounts.length) body += '<div><p class="mlabel">New in the last 24 hours · ' + fresh.length + '</p><div class="mlist">' +
         (fresh.length ? fresh.slice(0, 30).map(function (m) {
-          return '<div class="msg"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span><div class="l1"><b>' + esc(m.from_name || m.from_address || '') + '</b><span>' + esc(m.subject || '(no subject)') + '</span><small>' + new Date(m.received_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '</small></div>' +
-            '<p>' + esc(m.summary || m.snippet || '') + '</p><div class="acts2"><a href="' + esc(gmailLink(m)) + '" target="_blank" rel="noopener">Open in Gmail ↗</a></div></div>';
+          return '<div class="msg"><span class="av" style="background:' + esc(acctColor(m.account_id)) + '">' + esc(initials(m)) + '</span>' + mailHead(m) +
+            '<p>' + esc(m.summary || m.snippet || '') + '</p>' + gmailActs(m, 'Open in Gmail') + '</div>';
         }).join('') : '<div class="msg"><p style="color:var(--muted)">No new mail in the last 24 hours.</p></div>') + '</div></div>';
       return { t: 'ChatGPT’s summary', sub: who() + (S.digest ? ' · summary from ' + esc(S.digest.author || 'your assistant') : ''), note: 'Replies happen in Gmail', body: body || '<div class="empty"><b>No Gmail connected.</b></div>' };
     },

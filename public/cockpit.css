@@ -377,3 +377,26 @@ a.btnl,label.btnl{display:inline-flex;align-items:center;text-decoration:none;co
 .calzone.side-closed .calbody{grid-template-columns:3.1rem minmax(0,1fr)}
 .calsbtn{display:none}
 @media (max-width:760px){.calside{display:none}.calbody,.calzone.side-closed .calbody{grid-template-columns:minmax(0,1fr)}.calsbtn{display:inline-flex}}
+/* Email rows read like Gmail: sender and time on top, then the subject in bold with the summary after it */
+.ask.gm .tx{display:flex;flex-direction:column;gap:.1rem}
+.ask.gm .tx .r1{display:flex;align-items:center;gap:.4rem;min-width:0;font-size:.82rem;white-space:nowrap}
+.ask.gm .tx .r1 .from{display:inline;font-size:.88rem;font-weight:800;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ask.gm .tx .r1 .cotag{margin:0;flex:0 0 auto}
+.ask.gm .tx .r1 time{margin-left:auto;flex:0 0 auto;font-size:.72rem;font-weight:700;color:var(--muted)}
+.ask.gm .tx .r2{display:block;font-size:.8rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ask.gm .tx .r2 b{display:inline;font-size:inherit;font-weight:700;color:var(--ink)}
+.ask.gm .tx .r2 span{display:inline}
+@media (max-width:760px){.ask.gm .tx .r2 span{display:none}}
+/* Calendar list button: ☰ Collapse when open, ☰ alone when collapsed */
+.menubtn{display:inline-flex;align-items:center;gap:.4rem;width:auto;min-width:2.2rem;padding:0 .6rem;font-size:.8rem;font-weight:700;color:var(--muted)}
+.menubtn .mbi{font-size:1.05rem;line-height:1;color:var(--ink)}
+.menubtn:hover{color:var(--ink)}
+.calzone.side-closed .menubtn{padding:0;justify-content:center;width:2.2rem}
+/* Dock: each app's name always shows under its icon */
+.dock{align-items:flex-start;gap:.35rem;padding:.45rem .6rem .35rem}
+.dock a,.dock button{min-width:3.9rem;gap:.25rem;padding:.1rem .15rem;border-radius:.8rem}
+.dock a span,.dock button span{position:static;opacity:1;background:none;color:var(--muted);padding:0;font-size:.66rem;font-weight:700;pointer-events:auto;transition:color .15s}
+.dock button:hover span,.dock button:focus-visible span,.dock a:hover span,.dock a:focus-visible span{color:var(--ink)}
+.dock button:hover i,.dock button:focus-visible i,.dock a:hover i,.dock a:focus-visible i{transform:translateY(-.2rem) scale(1.07)}
+.dock a i,.dock button i{width:2.5rem;height:2.5rem}
+@media (max-width:760px){.dock a,.dock button{min-width:2.9rem}.dock a span,.dock button span{font-size:.6rem}}

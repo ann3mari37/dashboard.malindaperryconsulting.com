@@ -300,3 +300,15 @@ input.evfield::placeholder{color:#6B7774}
   .evbusy{margin-left:3.4rem;margin-right:1rem}
 }
 @media (prefers-reduced-motion:reduce){.schart .sb i,.agd,.cxm{animation:none}}
+
+/* Emails in the email view: sender <address> and date, then the subject as a heading, as Gmail shows a message */
+.msg .l1{display:flex;align-items:baseline;gap:.45rem;flex-wrap:nowrap;min-width:0}
+.msg .l1 .from{font-size:.95rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0}
+.msg .l1 .addr{color:var(--muted);font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 2 auto;min-width:0}
+.msg .l1 .cotag{flex:0 0 auto;align-self:center}
+.msg .l1 time{margin-left:auto;flex:0 0 auto;font-size:.76rem;font-weight:700;color:var(--muted);white-space:nowrap}
+.msg .subj{font-size:1.02rem;font-weight:700;letter-spacing:-.01em;margin:.1rem 0 .15rem;color:var(--ink)}
+@media (max-width:760px){.msg .l1 .addr{display:none}}
+.msg .inbox{margin:.35rem 0 0;font-size:.74rem;color:var(--muted)}
+.msg .inbox b{color:var(--ink);font-weight:700}
+.msg .inbox a{color:#1A73E8;font-weight:700;text-decoration:underline;text-underline-offset:2px}
