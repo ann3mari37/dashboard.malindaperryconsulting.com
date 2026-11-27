@@ -537,7 +537,8 @@
         return '<div class="srow"><span class="swatch" style="background:' + esc(a.color || '#1E9E98') + '"></span><span class="grow">' + esc(a.name) + '</span>' + co(areaCo(a.id), 'data-src="area" data-ref="' + esc(a.id) + '" aria-label="Business for ' + esc(a.name) + '"') + '</div>';
       }).join('') || '<div class="srow"><span class="grow" style="color:var(--muted)">No life areas in Tasks yet</span></div>') + '</div></div>';
       body += '<div class="set"><p class="mlabel">Payhip stores</p><div class="mlist" id="storeList">' + (S.stores.map(function (s) {
-        return '<div class="srow"><span class="grow">' + esc(s.name) + '<small>Added ' + new Date(s.created_at).toLocaleDateString() + '</small></span>' + tag(s.company) + '<button type="button" class="btnl" data-delstore="' + esc(s.id) + '">Remove</button></div>';
+        return '<div class="srow"><span class="grow">' + esc(s.name) + '<small>Added ' + new Date(s.created_at).toLocaleDateString() + '</small></span>' + tag(s.company) + '<label class="btnl" style="cursor:pointer">Import past sales<input type="file" accept=".csv,text/csv" data-import="' + esc(s.id) + '" hidden></label><button type="button" class="btnl" data-delstore="' + esc(s.id) + '">Remove</button></div>' +
+          '<div class="srow"><span class="grow"><small>New sales arrive by themselves. For sales from before ' + new Date(s.created_at).toLocaleDateString() + ', download your sales export (CSV) from Payhip and import it here once. Sales already here aren’t counted twice.</small></span></div>';
       }).join('') || '<div class="srow"><span class="grow" style="color:var(--muted)">No stores yet</span></div>') +
         '<form class="addstore" id="addStore"><input id="stName" placeholder="Store name" required maxlength="80" aria-label="Store name">' + co('mpc', 'id="stCo" aria-label="Business"') + '<input id="stKey" placeholder="Payhip API key (optional)" aria-label="Payhip API key, optional" autocomplete="off"><button type="submit" class="btnl">Add store</button></form><div id="hookOut"></div></div></div>';
       body += '<div class="srow" style="border:0;padding:0"><button type="button" class="btnl" id="signOut">Sign out of this device</button></div>';
@@ -583,7 +584,22 @@
   });
 
   /* settings + email actions inside the modal */
-  modal.addEventListener('change', function (e) {
+  modal.addEventListener('change', async function (e) {
+    // Past sales: Payhip's API can't list sales and webhooks start when a store is added, so history comes from
+    // Payhip's sales export (CSV). The Worker reads it and skips sales already here.
+    var imp = e.target.closest('input[data-import]');
+    if (imp) {
+      var file = imp.files && imp.files[0]; if (!file) return;
+      if (file.size > 5000000) { toast('That file is too big. Export a shorter date range.'); imp.value = ''; return; }
+      toast('Importing…');
+      try {
+        var r = await api('/api/payhip/import', { store_id: imp.dataset.import, csv: await file.text() });
+        toast(r.added ? 'Imported ' + r.added + ' past sale' + (r.added === 1 ? '' : 's') + '.' : r.found ? 'Those sales were already here.' : 'No sales found in that file.');
+        await loadData();
+      } catch (err) { toast(err.message === 'not_a_sales_export' ? 'That doesn’t look like a Payhip sales export.' : 'Couldn’t import it. Try again.'); }
+      imp.value = '';
+      return;
+    }
     var sel = e.target.closest('select[data-src]');
     if (sel) {
       saveSource(sel.dataset.src, sel.dataset.ref, { company: sel.value }).then(function () { renderAll(); });
