@@ -519,6 +519,17 @@
           return '<div class="srow"><span class="swatch" style="background:' + esc(a.color || '#E0602E') + '"></span><span class="grow">' + esc(a.email_address) + '<small>Connected once · works on every device</small></span>' + warn + co(mailCo(a.id), 'data-src="mailbox" data-ref="' + esc(a.id) + '" aria-label="Business for ' + esc(a.email_address) + '"') + '</div>';
         }).join('') || '<div class="srow"><span class="grow" style="color:var(--muted)">No Google account yet</span></div>') +
         '<div class="srow"><button type="button" class="btnl" data-connect="1">+ Connect a Google account</button><span class="grow"><small>Also use this to reconnect an account for its calendar.</small></span></div></div></div>';
+      // ChatGPT: the Momentum connector is added once to the ChatGPT account, so it works on every device signed in to
+      // ChatGPT. These steps add it, and test it, from any device.
+      var mcpUrl = C.api + '/api/mcp';
+      var chatUsed = S.digest && S.digest.source === 'chat' ? new Date(S.digest.digest_date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+      var testPrompt = 'Use the Momentum connector: call get_today and tell me my first three tasks. If you can’t reach Momentum, tell me how to turn the connector on in this chat.';
+      body += '<div class="set"><p class="mlabel">ChatGPT (Momentum connector)</p><div class="mlist">' +
+        '<div class="srow"><span class="grow">' + (chatUsed ? 'Connected · last briefing ' + esc(chatUsed) : 'No ChatGPT briefing yet') + '<small>Add it once to your ChatGPT account and it works on every device where you’re signed in to ChatGPT. A new device only needs a ChatGPT sign-in.</small></span></div>' +
+        '<div class="srow"><span class="grow">1. Copy the connector address<div class="hookbox" style="margin-top:.35rem"><code id="mcpUrl">' + esc(mcpUrl) + '</code><button type="button" class="btnl" id="copyMcp">Copy</button></div></span></div>' +
+        '<div class="srow"><span class="grow">2. In ChatGPT, open Settings → Apps &amp; Connectors (or Connectors), add a custom connector named <b>Momentum</b> with that address, and sign in with this cockpit’s account.</span><a class="btnl" href="https://chatgpt.com/#settings/Connectors" target="_blank" rel="noopener">Open ChatGPT settings ↗</a></div>' +
+        '<div class="srow"><span class="grow">3. Check it works<small>Opens ChatGPT with a short test prompt. Turn on Momentum in that chat if it asks.</small></span><a class="btnl" href="https://chatgpt.com/?q=' + encodeURIComponent(testPrompt) + '" target="_blank" rel="noopener">Test in ChatGPT ↗</a></div>' +
+        '</div></div>';
       body += '<div class="set"><p class="mlabel">Calendars</p><div class="mlist">' + (S.cals.map(function (c) {
         return '<div class="srow"><span class="swatch" style="background:' + esc(c.color) + '"></span><span class="grow">' + esc(c.name) + '<small>' + esc(c.email) + (c.can_add ? '' : ' · view only') + '</small></span><label><input type="checkbox" data-show="' + esc(c.key) + '"' + (c.shown ? ' checked' : '') + '> Show</label>' + co(calCo(c.account_id, c.id), 'data-src="calendar" data-ref="' + esc(c.key) + '" aria-label="Business for ' + esc(c.name) + '"') + '</div>';
       }).join('') || '<div class="srow"><span class="grow" style="color:var(--muted)">Calendars appear after you connect Google</span></div>') + '</div></div>';
@@ -599,9 +610,9 @@
     } catch (err) { toast('Couldn’t add the store (' + err.message + ').'); }
   });
   modal.addEventListener('click', async function (e) {
-    if (e.target.id === 'copyHook') {
-      var t = $('#hookUrl').textContent;
-      try { await navigator.clipboard.writeText(t); toast('Copied.'); } catch (err) { var r = document.createRange(); r.selectNodeContents($('#hookUrl')); var s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Selected. Copy it with your keyboard.'); }
+    if (e.target.id === 'copyHook' || e.target.id === 'copyMcp') {
+      var box = $(e.target.id === 'copyHook' ? '#hookUrl' : '#mcpUrl'), t = box.textContent;
+      try { await navigator.clipboard.writeText(t); toast('Copied.'); } catch (err) { var r = document.createRange(); r.selectNodeContents(box); var s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Selected. Copy it with your keyboard.'); }
       return;
     }
     if (e.target.id === 'signOut') { await sb.auth.signOut(); closeView(); showSignIn(); return; }
