@@ -198,7 +198,7 @@ dialog.modal.wide{width:min(60rem,calc(100vw - 32px))}
   .top .date{font-size:.9rem}
   .main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1.2fr)}
   .cal{grid-template-columns:2.4rem repeat(2,minmax(0,1fr))}
-  .cal .d2,.cal .d4,.cal .d5,.cal .d6,.cal .d7{display:none}
+  .cal .d3,.cal .d4,.cal .d5,.cal .d6,.cal .d7{display:none}
   .zh .st,.wait,.ask .tx span,.expand{display:none}
   .asks{gap:.35rem;padding:.6rem .8rem .7rem}
   .side{grid-template-rows:minmax(0,1fr) minmax(0,.9fr)}
@@ -438,3 +438,14 @@ a.btnl,label.btnl{display:inline-flex;align-items:center;text-decoration:none;co
   .nr .v{display:flex;align-items:baseline;gap:.3rem;font-size:1.25rem}
   .nr .v small.under{display:inline;margin:0;font-size:.72rem}
 }
+
+/* Calendar section: move through days without opening the expanded view */
+.calnav{display:inline-flex;align-items:center;gap:0;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--white)}
+.calnav .chip{border:0;border-radius:0;background:none;box-shadow:none;min-width:2rem;justify-content:center;padding-inline:.55rem}
+.calnav .chip+.chip{border-left:1px solid var(--line)}
+.calnav #calPrev,.calnav #calFwd{font-size:1.15rem;line-height:1;font-weight:700}
+.calnav .chip:hover:not(:disabled){background:#F2F6F5}
+.calnav #calToday:disabled{opacity:.45;cursor:default}
+.cal{touch-action:pan-y}
+.cal.fetching .day{animation:calWait 1s ease-in-out infinite alternate}
+@keyframes calWait{from{opacity:1}to{opacity:.55}}

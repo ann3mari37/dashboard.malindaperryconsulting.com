@@ -293,8 +293,8 @@
   function needsInView() { return S.needs.filter(function (m) { return inView(mailCo(m.account_id)); }); }
   function tasksInView() { return S.tasks.filter(function (t) { return inView(areaCo(t.life_area_id)); }); }
   function salesInView() { return S.sales.filter(function (s) { return inView(storeCo(s.store_id)); }); }
-  function eventsInView() {
-    return S.events.filter(function (e) { var c = S.cals.find(function (x) { return x.key === e.key; }); return c && c.shown && inView(calCo(e.account_id, e.calendar_id)); });
+  function eventsInView(list) {
+    return (list || S.events).filter(function (e) { var c = S.cals.find(function (x) { return x.key === e.key; }); return c && c.shown && inView(calCo(e.account_id, e.calendar_id)); });
   }
 
   /* calendar */
@@ -342,6 +342,39 @@
     var b = e.target.closest('button[data-cal]'); if (b) toggleCal(b.dataset.cal);
   });
 
+  // The section moves through days without opening the expanded calendar: ‹ › step by the days on screen, a swipe
+  // (phone) or a sideways trackpad scroll (computer) steps one day. Days past this week load when first shown.
+  var CAL = { off: 0 }, CALDONE = new WeakMap();
+  var calPhone = function () { return window.matchMedia('(max-width:760px)').matches; };
+  function calShift(n) { CAL.off = n === 0 ? 0 : CAL.off + n; renderCal(); }
+  function calEvents(start) {
+    if (CAL.off === 0) return eventsInView();
+    var p = fetchRange(start, addDays(start, 7)), got = CALDONE.get(p);
+    if (got) return eventsInView(got);
+    p.then(function (l) { CALDONE.set(p, l); if (+addDays(calStart(), CAL.off) === +start) renderCal(); },
+      function () { CALDONE.set(p, []); toast('Couldn’t load those days. Try again.'); });
+    return null;
+  }
+  $('#calPrev').addEventListener('click', function () { calShift(-(calPhone() ? 2 : 7)); });
+  $('#calFwd').addEventListener('click', function () { calShift(calPhone() ? 2 : 7); });
+  $('#calToday').addEventListener('click', function () { calShift(0); });
+  (function () {
+    var cal = $('#cal'), x0 = null, y0 = 0, acc = 0, last = 0;
+    cal.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+    cal.addEventListener('touchend', function (e) {
+      if (x0 === null) return;
+      var dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null;
+      if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) calShift(dx < 0 ? 1 : -1);
+    });
+    cal.addEventListener('wheel', function (e) {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      var t = Date.now(); if (t - last > 400) acc = 0;
+      acc += e.deltaX; last = t;
+      if (Math.abs(acc) > 90) { calShift(acc > 0 ? 1 : -1); acc = 0; }
+    }, { passive: false });
+  })();
+
   function renderCal() {
     var el = $('#cal');
     if (!S.calLoaded) { el.innerHTML = ''; el.classList.add('loading'); return; }
@@ -357,16 +390,21 @@
       return;
     }
     el.style.display = '';
-    var start = calStart(), days = [];
+    var today = calStart(), start = addDays(today, CAL.off), days = [];
     for (var i = 0; i < 7; i++) days.push(addDays(start, i));
-    var evs = eventsInView(), timed = evs.filter(function (e) { return !e.all_day; });
+    var got = calEvents(start), evs = got || [], timed = evs.filter(function (e) { return !e.all_day; });
+    el.classList.toggle('fetching', !got);
+    var isT = function (d) { return +d === +today; };
+    $('#calToday').disabled = CAL.off === 0;
+    var shownTo = addDays(start, calPhone() ? 1 : 6), md = { month: 'short', day: 'numeric' };
+    $('#calRange').textContent = CAL.off === 0 ? 'Next 7 days from all your Google calendars' : start.toLocaleDateString(undefined, md) + ' – ' + shownTo.toLocaleDateString(undefined, md);
     var START = 8, END = 18;
     timed.forEach(function (e) { START = Math.min(START, Math.floor(hours(e.s))); END = Math.max(END, Math.ceil(e.e.getDate() !== e.s.getDate() ? 24 : hours(e.e))); });
     START = Math.max(6, START); END = Math.min(23, Math.max(END, START + 6));
     var span = END - START, now = new Date();
     var html = '<div></div>' + days.map(function (d, i) {
       var wk = d.getDay() === 0 || d.getDay() === 6;
-      return '<div class="dh d' + (i + 1) + (i === 0 ? ' today' : '') + (wk ? ' wk' : '') + '"><b>' + d.getDate() + '</b><span>' + (i === 0 ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' })) + '</span></div>';
+      return '<div class="dh d' + (i + 1) + (isT(d) ? ' today' : '') + (wk ? ' wk' : '') + '"><b>' + d.getDate() + '</b><span>' + (isT(d) ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' })) + '</span></div>';
     }).join('');
     html += '<div></div>' + days.map(function (d, i) {
       var next = addDays(d, 1);
@@ -378,19 +416,20 @@
     html += hrs + '</div>';
     days.forEach(function (d, i) {
       var wk = d.getDay() === 0 || d.getDay() === 6, next = addDays(d, 1);
-      html += '<div class="day d' + (i + 1) + (i === 0 ? ' today' : '') + (wk ? ' wk' : '') + '" style="background-size:100% ' + (100 / span) + '%">';
+      html += '<div class="day d' + (i + 1) + (isT(d) ? ' today' : '') + (wk ? ' wk' : '') + '" style="background-size:100% ' + (100 / span) + '%">';
       timed.filter(function (e) { return e.s < next && e.e > d; }).forEach(function (e) {
         var c = calOf(e), s = Math.max(START, e.s < d ? 0 : hours(e.s)), en = Math.min(END, e.e > next ? 24 : hours(e.e));
         if (en <= START || s >= END) return;
         var past = e.e <= now;
         html += '<div class="ev' + (past ? ' past' : '') + '" style="--evbg:' + tint(c.color) + ';--evc:' + esc(c.color) + ';--evink:#10292C;top:' + ((s - START) / span * 100) + '%;height:calc(' + (Math.max(en - s, 0.4) / span * 100) + '% - 3px)" title="' + esc(c.name + ': ' + e.title) + '"><b>' + esc(e.title) + '</b><small>' + fmtTime(e.s) + (e.location ? ' · ' + esc(e.location) : '') + '</small></div>';
       });
-      if (i === 0 && hours(now) > START && hours(now) < END) html += '<div class="nowline" style="top:' + ((hours(now) - START) / span * 100) + '%" aria-label="Now"></div>';
+      if (isT(d) && hours(now) > START && hours(now) < END) html += '<div class="nowline" style="top:' + ((hours(now) - START) / span * 100) + '%" aria-label="Now"></div>';
       html += '</div>';
     });
     el.innerHTML = html;
-    var nx = timed.filter(function (e) { return e.s > now && e.s < addDays(start, 1); }).sort(function (a, b) { return a.s - b.s; })[0];
-    $('#calNext').textContent = nx ? ' · Next: ' + nx.title + ' at ' + fmtTime(nx.s) : ' · Nothing else today';
+    // "Next" is always about today, wherever the section has been moved to.
+    var nx = eventsInView().filter(function (e) { return !e.all_day && e.s > now && e.s < addDays(today, 1); }).sort(function (a, b) { return a.s - b.s; })[0];
+    $('#calNext').textContent = CAL.off !== 0 ? '' : nx ? ' · Next: ' + nx.title + ' at ' + fmtTime(nx.s) : ' · Nothing else today';
   }
   function calOf(e) { return S.cals.find(function (x) { return x.key === e.key; }) || { color: '#2F7FD0', name: 'Calendar' }; }
   function tint(hex) { // a light background version of a calendar color
